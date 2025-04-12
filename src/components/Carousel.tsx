@@ -11,10 +11,14 @@ export function Carousel({
   cards,
   onDeleteCard,
   onEditCard,
+  onAddToWallet,
+  onShare,
 }: {
   cards: CardType[];
   onDeleteCard: (id: CardType["id"]) => Promise<void>;
   onEditCard: (card: CardType) => void;
+  onAddToWallet: (id: CardType["id"]) => void;
+  onShare: (id: CardType["id"]) => void;
 }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: true, // Enable looping
@@ -56,6 +60,8 @@ export function Carousel({
                 {...card}
                 onDeleteCard={onDeleteCard}
                 onEditCard={() => onEditCard(card)}
+                onAddToWallet={() => onAddToWallet(card.id)}
+                onShare={() => onShare(card.id)}
               />
             </div>
           ))}

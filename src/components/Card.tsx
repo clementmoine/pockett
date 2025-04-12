@@ -173,7 +173,7 @@ export function Card({
                   )}
 
                   <span className="text-sm text-slate-950 font-mono text-center w-full truncate">
-                    {code.trim().length > 1 ? name : "N/A"}
+                    {code.trim().length > 1 ? code : "N/A"}
                   </span>
                 </div>
               </div>
