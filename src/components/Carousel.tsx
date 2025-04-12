@@ -13,7 +13,7 @@ export function Carousel({
   onEditCard,
 }: {
   cards: CardType[];
-  onDeleteCard: (id: string) => Promise<void>;
+  onDeleteCard: (id: CardType["id"]) => Promise<void>;
   onEditCard: (card: CardType) => void;
 }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({

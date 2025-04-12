@@ -26,20 +26,40 @@ import type { Card as CardType } from "@/lib/types";
 import { Card } from "@/components/Card";
 import { convertToBase64 } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { v4 as uuidv4 } from "uuid";
+import { createHash } from "crypto"; // Import crypto for hashing
 
 const cardSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  id: z.string().min(1, "ID is required"),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .refine((value) => value.trim().length > 0, "Name cannot be empty spaces"),
+  code: z
+    .string()
+    .trim()
+    .min(1, "Code is required")
+    .refine((value) => value.trim().length > 0, "Code cannot be empty spaces"),
   logo: z
     .any()
     .refine(
       (file) => file instanceof File || file === null,
       "Invalid file type",
     ),
-  theme: z.string().min(1, "Theme is required"),
+  theme: z
+    .string()
+    .trim()
+    .min(1, "Theme is required")
+    .refine((value) => value.trim().length > 0, "Theme cannot be empty spaces"),
 });
 
 type CardFormValues = z.infer<typeof cardSchema>;
+
+const generateNumericId = () => {
+  const uuid = uuidv4(); // Generate a UUID
+  const hash = createHash("sha256").update(uuid).digest("hex"); // Hash the UUID
+  return parseInt(hash.slice(0, 12), 16); // Convert a portion of the hash to a number
+};
 
 export function CardFormModal({
   isOpen,
@@ -62,7 +82,7 @@ export function CardFormModal({
     resolver: zodResolver(cardSchema),
     defaultValues: {
       name: "",
-      id: "",
+      code: "",
       logo: null,
       theme: "",
     },
@@ -75,7 +95,7 @@ export function CardFormModal({
     if (card) {
       reset({
         name: card.name || "",
-        id: card.id || "",
+        code: card.code || "",
         logo: null, // File inputs cannot be pre-filled
         theme: card.theme || "",
       });
@@ -83,7 +103,7 @@ export function CardFormModal({
     } else {
       reset({
         name: "",
-        id: "",
+        code: "",
         logo: null,
         theme: "",
       });
@@ -109,8 +129,9 @@ export function CardFormModal({
       : card?.logo || null;
 
     const updatedCard: CardType = {
+      id: card ? card.id : generateNumericId(), // Generate a numeric ID if not editing
       name: values.name,
-      id: values.id,
+      code: values.code, // Use `code` instead of `id`
       logo: logoBase64, // Store as Base64
       theme: values.theme,
     };
@@ -157,10 +178,11 @@ export function CardFormModal({
                 {/* Card preview */}
                 <div className="flex justify-center">
                   <Card
-                    name={form.watch("name") || "N/A"}
-                    theme={form.watch("theme") || "N/A"}
+                    id={-1}
+                    name={form.watch("name")}
+                    theme={form.watch("theme")}
                     logo={logoPreview || null}
-                    id={form.watch("id") || "N/A"}
+                    code={form.watch("code")} // Display the code
                   />
                 </div>
                 <FormField
@@ -178,16 +200,12 @@ export function CardFormModal({
                 />
                 <FormField
                   control={form.control}
-                  name="id"
+                  name="code"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>ID</FormLabel>
+                      <FormLabel>Code</FormLabel>
                       <FormControl>
-                        <Input
-                          placeholder="Enter card ID"
-                          {...field}
-                          disabled={!!card} // Disable ID field when editing
-                        />
+                        <Input placeholder="Enter card code" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

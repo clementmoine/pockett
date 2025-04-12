@@ -22,23 +22,21 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+import type { Card as CardType } from "@/lib/types";
 import { Share, WalletCards } from "lucide-react";
 
-export type CardProps = {
-  name: string; // Card name
-  logo: string | null; // URL of the logo
-  theme: string; // Background color or theme
-  id: string; // Barcode ID
-  onDeleteCard?: (id: string) => Promise<void>;
+export interface CardProps extends CardType {
+  onDeleteCard?: (id: CardType["id"]) => Promise<void>;
   onEditCard?: () => void;
-  onAddToWallet?: (id: string) => void;
-  onShare?: (id: string) => void;
-};
+  onAddToWallet?: (id: CardType["id"]) => void;
+  onShare?: (id: CardType["id"]) => void;
+}
 
 export function Card({
   name,
   logo,
   theme,
+  code,
   id,
   onDeleteCard,
   onEditCard,
@@ -55,11 +53,17 @@ export function Card({
   // Generate the code as a Base64 image URL
   useEffect(() => {
     const generateCode = async () => {
-      const parsedId = id.replace(/[^a-zA-Z0-9]/g, ""); // Remove special characters and whitespaces
+      const parsedCode = code.replace(/[^a-zA-Z0-9]/g, "");
 
-      if (parsedId.length > 26) {
+      // Check if the code is not empty
+      if (!parsedCode) {
+        setCodeDataUrl(null);
+        return;
+      }
+
+      if (parsedCode.length > 26) {
         // Use QR code for larger data
-        const qrCodeUrl = await QRCode.toDataURL(parsedId, {
+        const qrCodeUrl = await QRCode.toDataURL(parsedCode, {
           width: 128,
           margin: 1,
         });
@@ -67,7 +71,7 @@ export function Card({
       } else {
         // Use barcode for smaller data
         const canvas = document.createElement("canvas");
-        JsBarcode(canvas, parsedId, {
+        JsBarcode(canvas, parsedCode, {
           lineColor: "#000",
           width: 2,
           height: 100,
@@ -78,7 +82,7 @@ export function Card({
     };
 
     generateCode();
-  }, [id]);
+  }, [code]);
 
   const handleDelete = async () => {
     if (!onDeleteCard) return; // If no delete function is provided, do nothing
@@ -131,7 +135,7 @@ export function Card({
                   </span>
                 )}
                 <span className="text-sm text-slate-950 text-center w-full">
-                  {name}
+                  {name.trim().length > 1 ? name : "N/A"}
                 </span>
               </div>
 
@@ -158,7 +162,7 @@ export function Card({
 
                 {/* Code (Barcode or QR Code) */}
                 <div className="flex flex-col bg-white rounded-md p-2 overflow-hidden w-full gap-2">
-                  {codeDataUrl ? (
+                  {codeDataUrl != null && (
                     <Image
                       width={128}
                       height={128}
@@ -166,12 +170,10 @@ export function Card({
                       alt="Code"
                       className="h-16 w-full object-contain"
                     />
-                  ) : (
-                    <span className="text-sm text-slate-950">Loading...</span>
                   )}
 
                   <span className="text-sm text-slate-950 font-mono text-center w-full truncate">
-                    {id}
+                    {code.trim().length > 1 ? name : "N/A"}
                   </span>
                 </div>
               </div>

@@ -27,7 +27,7 @@ export function useCardStorage() {
 
   // Remove a card by ID
   const deleteCard = useCallback(
-    async (cardId: string) => {
+    async (cardId: Card["id"]) => {
       const storedCards =
         (await localforage.getItem<Card[]>(CARD_STORAGE_KEY)) || [];
       const updatedCards = storedCards.filter((card) => card.id !== cardId);
@@ -39,7 +39,7 @@ export function useCardStorage() {
 
   // Get a single card by ID
   const getCard = useCallback(
-    async (cardId: string): Promise<Card | undefined> => {
+    async (cardId: Card["id"]): Promise<Card | undefined> => {
       const storedCards =
         (await localforage.getItem<Card[]>(CARD_STORAGE_KEY)) || [];
       return storedCards.find((card) => card.id === cardId);
