@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import JsBarcode from "jsbarcode";
-import QRCode from "qrcode"; // Import QRCode library
+import QRCode from "qrcode";
 import { motion } from "framer-motion";
 import {
   ContextMenu,

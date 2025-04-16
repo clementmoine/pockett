@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/dialog";
 import type { Card as CardType } from "@/lib/types";
 import { Card } from "@/components/Card";
-import { convertToBase64 } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { v4 as uuidv4 } from "uuid";
 import { createHash } from "crypto"; // Import crypto for hashing
@@ -59,6 +58,15 @@ const generateNumericId = () => {
   const uuid = uuidv4(); // Generate a UUID
   const hash = createHash("sha256").update(uuid).digest("hex"); // Hash the UUID
   return parseInt(hash.slice(0, 12), 16); // Convert a portion of the hash to a number
+};
+
+const convertFileToBase64 = async (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string); // Convert file to base64
+    reader.onerror = (error) => reject(error);
+    reader.readAsDataURL(file); // Read the file as a Data URL
+  });
 };
 
 export function CardFormModal({
@@ -96,7 +104,7 @@ export function CardFormModal({
       reset({
         name: card.name || "",
         code: card.code || "",
-        logo: null, // File inputs cannot be pre-filled
+        logo: card.logo || null, // Pre-fill with dataUri if available
         theme: card.theme || "",
       });
       setLogoPreview(card.logo || null);
@@ -111,28 +119,31 @@ export function CardFormModal({
     }
   }, [card, reset]);
 
-  const handleLogoChange = (file: File | null) => {
+  const handleLogoChange = async (file: File | null) => {
     if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setLogoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const base64 = await convertFileToBase64(file);
+        setLogoPreview(base64);
+      } catch (error) {
+        console.error("Error converting file to base64:", error);
+        setLogoPreview(null);
+      }
     } else {
       setLogoPreview(null);
     }
   };
 
   const handleSubmit = async (values: CardFormValues) => {
-    const logoBase64 = values.logo
-      ? await convertToBase64(values.logo) // Convert the file to Base64
-      : card?.logo || null;
+    let logo: string | null = null;
+    if (values.logo) {
+      logo = await convertFileToBase64(values.logo);
+    }
 
     const updatedCard: CardType = {
       id: card ? card.id : generateNumericId(), // Generate a numeric ID if not editing
       name: values.name,
       code: values.code, // Use `code` instead of `id`
-      logo: logoBase64, // Store as Base64
+      logo: logo, // Store the base64 string directly
       theme: values.theme,
     };
 
@@ -185,6 +196,7 @@ export function CardFormModal({
                     code={form.watch("code")} // Display the code
                   />
                 </div>
+
                 <FormField
                   control={form.control}
                   name="name"
@@ -198,19 +210,7 @@ export function CardFormModal({
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="code"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Code</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter card code" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+
                 <FormField
                   control={form.control}
                   name="logo"
@@ -231,6 +231,7 @@ export function CardFormModal({
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={form.control}
                   name="theme"
@@ -239,6 +240,20 @@ export function CardFormModal({
                       <FormLabel>Theme</FormLabel>
                       <FormControl>
                         <Input placeholder="Enter card theme" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter card code" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

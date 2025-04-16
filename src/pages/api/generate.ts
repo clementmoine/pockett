@@ -1,8 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import path from "path";
-import fs from "fs";
-import { Template } from "@walletpass/pass-js";
-import sharp from "sharp"; // Import sharp for image processing
+import color from "color"; // Add this import
+import sharp from "sharp"; // Add sharp for image conversion
+import { dataUriToBuffer } from "data-uri-to-buffer"; // Import dataUriToBuffer
 
 export const config = {
   api: {
@@ -11,6 +10,64 @@ export const config = {
     },
   },
 };
+
+function formatColorToRgba(inputColor: string): string {
+  try {
+    return color(inputColor.toLowerCase()).hex();
+  } catch (error) {
+    console.error(`Invalid color format: ${inputColor}`, error);
+    return "#FFF"; // Default to white if the color is invalid
+  }
+}
+
+async function processAndUploadLogo(dataUri: string): Promise<string> {
+  const apiKey = process.env.ADDTOWALLET_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("ADDTOWALLET_API_KEY is missing in environment variables");
+  }
+
+  const { buffer } = dataUriToBuffer(dataUri);
+
+  // Resize and convert the image to PNG (150x150px)
+  const pngBuffer = await sharp(buffer)
+    .resize({
+      width: 150,
+      height: 150,
+      fit: "contain",
+      background: { r: 255, g: 255, b: 255, alpha: 0 },
+    })
+    .png()
+    .toBuffer();
+
+  // Create a FormData object for the multipart/form-data request
+  const formData = new FormData();
+  formData.append(
+    "file",
+    new File([pngBuffer], "logo.png", { type: "image/png" }),
+  );
+
+  const uploadUrl =
+    "https://app.addtowallet.co/api/card/upload?path=/&type=logoUrl";
+
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      accesstoken: apiKey,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to upload logo to AddToWallet (${response.statusText})`,
+    );
+  }
+
+  const { data } = (await response.json()) as { data: { url: string } };
+
+  return data.url; // Return the hosted image URL
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -27,75 +84,70 @@ export default async function handler(
   };
 
   try {
-    // Load the template
-    const templatePath = path.join(process.cwd(), "pass-template");
-    const template = await Template.load(
-      templatePath,
-      "your-certificate-password",
-    );
+    const apiKey = process.env.ADDTOWALLET_API_KEY;
 
-    // Load the certificate and private key
-    const certPath = path.join(process.cwd(), "certs", "wwdr.pem");
-    const keyPath = path.join(process.cwd(), "certs", "key.pem");
+    const baseUrl = "https://app.addtowallet.co/";
 
-    if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
-      throw new Error("Certificate or private key file is missing.");
+    if (!apiKey) {
+      return res.status(500).json({
+        error: "ADDTOWALLET_API_KEY is missing in environment variables",
+      });
     }
 
-    const cert = fs.readFileSync(certPath, "utf-8");
-    const key = fs.readFileSync(keyPath, "utf-8");
-
-    await template.setCertificate(cert);
-    await template.setPrivateKey(key, "your-certificate-password"); // Replace with your actual password
-
-    // Set template fields
-    template.passTypeIdentifier = "pass.com.example.passbook";
-    template.teamIdentifier = "YOUR_TEAM_ID"; // Replace with your actual team ID
-    template.organizationName = "Your Organization";
-    template.backgroundColor = card.theme;
-    template.foregroundColor = "rgb(255, 255, 255)";
-    template.labelColor = "rgb(0, 0, 0)";
-
-    const iconPath = path.join(process.cwd(), "pass-assets", "icon.png");
-    const logoPath = path.join(process.cwd(), "pass-assets", "logo.png");
-    if (fs.existsSync(iconPath)) {
-      await template.images.add("icon", iconPath);
-    }
-    if (fs.existsSync(logoPath)) {
-      await template.images.add("logo", logoPath);
+    // Process and upload the logo if provided
+    let logoUrl: string | null = null;
+    if (card.logo) {
+      logoUrl = await processAndUploadLogo(card.logo);
     }
 
-    // Create a pass from the template
-    const pass = template.createPass({
-      serialNumber: card.id.toString(),
-      description: "Personalized Card",
+    // Code to be used for the barcode
+    const parsedCode = card.code.replace(/[^a-zA-Z0-9]/g, "");
+    const type = parsedCode.length > 26 ? "QR_CODE" : "CODE_128";
+
+    // Format the theme color to RGBA
+    const formattedTheme = formatColorToRgba(card.theme);
+
+    // Call the Create Card API using fetch
+    const response = await fetch(`${baseUrl}api/card/create`, {
+      method: "POST",
+      headers: {
+        apikey: apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        passType: "generic",
+        genericType: "GENERIC_TYPE_UNSPECIFIED",
+        logoUrl,
+        cardTitle: card.name,
+        header: card.name,
+        textModulesData: [],
+        linksModuleData: [],
+        barcodeType: type,
+        barcodeValue: parsedCode,
+        barcodeAltText: parsedCode,
+        hexBackgroundColor: formattedTheme,
+        appleFontColor: "#FFFFFF",
+        changedAppleFontColor: false,
+        stateType: "ACTIVE",
+        subheader: "",
+        herorawurl: null,
+        heroImage: null,
+        notificationHeading: null,
+      }),
     });
 
-    // Add fields to the pass
-    pass.primaryFields.add({
-      key: "name",
-      label: "Name",
-      value: card.name,
-    });
+    if (!response.ok) {
+      console.error("Error creating card:", response);
+      throw new Error(`Failed to create card: ${response.statusText}`);
+    }
 
-    pass.secondaryFields.add({
-      key: "code",
-      label: "Code",
-      value: card.code,
-    });
+    const { cardId } = (await response.json()) as { cardId: string };
 
-    // Generate the pass as a buffer
-    const buffer = await pass.asBuffer();
+    const cardUrl = `${baseUrl}card/${cardId}`;
 
-    // Send the pass to the client
-    res.setHeader("Content-Type", "application/vnd.apple.pkpass");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=card-${card.id}.pkpass`,
-    );
-    res.send(buffer);
+    // Response with the card URL
+    res.status(200).json({ cardUrl });
   } catch (error) {
-    console.error("Error generating pass:", error);
-    res.status(500).json({ error: "Failed to generate pass" });
+    res.status(500).json({ error: `Failed to generate pass, ${error}` });
   }
 }

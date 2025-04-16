@@ -53,20 +53,13 @@ export default function Home() {
                       throw new Error(err.error || "Failed to generate pass");
                     });
                   }
-                  return response.arrayBuffer();
+                  return response.json();
                 })
-                .then((buffer) => {
-                  const url = window.URL.createObjectURL(
-                    new Blob([buffer], {
-                      type: "application/vnd.apple.pkpass",
-                    }),
-                  );
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `${card.name}.pkpass`;
-                  a.click();
-                  URL.revokeObjectURL(url);
+                .then((data) => {
+                  const { cardUrl } = data;
+                  window.location.href = cardUrl;
                 })
+                // Handle errors
                 .catch((error) => {
                   console.error("Error generating pass:", error);
                   alert(`Error: ${error.message}`); // Display error to the user
