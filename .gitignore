@@ -40,3 +40,9 @@ certs/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+certificates
+
+# Serwist
+public/sw*
+public/swe-worker*

@@ -15,12 +15,12 @@ export default function Home() {
     useCardStorage();
 
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground-900">
+    <div className="flex flex-col h-screen bg-background text-foreground">
       {/* Header */}
       <header className="flex items-center justify-between p-4 border-b bg-background shadow-sm">
         <div className="flex items-center gap-2">
-          <GalleryVerticalEnd className="h-6 w-6 text-foreground-700" />
-          <h1 className="text-lg font-semibold text-foreground-800">Pockett</h1>
+          <GalleryVerticalEnd className="h-6 w-6 text-foreground" />
+          <h1 className="text-lg font-semibold text-foreground">Pockett</h1>
         </div>
         <Button onClick={() => setIsModalOpen(true)}>Add card</Button>
       </header>

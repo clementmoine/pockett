@@ -146,6 +146,10 @@ export default async function handler(
     const { cardId } = (await response.json()) as { cardId: string };
 
     const cardUrl = `${baseUrl}card/${cardId}`;
+    // https://app.addtowallet.co/api/preview/6802617f12cea52495de9917
+
+    // Call the preview url and get data.applePassUrl and data.googlePassUrl
+    // Send the pass depending on the system
 
     // Response with the card URL
     res.status(200).json({ cardUrl });

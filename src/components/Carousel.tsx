@@ -99,9 +99,9 @@ export function Carousel({
       {/* Empty state */}
       {cards.length === 0 && (
         <div className="flex flex-col items-center justify-center h-full">
-          <GalleryVerticalEnd className="h-16 w-16 text-foreground-500 mb-5" />
-          <p className="text-foreground-500 text-center">No cards available</p>
-          <p className="text-foreground-500 text-center">
+          <GalleryVerticalEnd className="h-16 w-16 text-foreground/50 mb-5" />
+          <p className="text-foreground text-center">No cards available</p>
+          <p className="text-foreground text-center">
             Add a new card to get started
           </p>
         </div>

@@ -52,6 +52,18 @@ export function Card({
 
   const hasActions = onEditCard || onDeleteCard || onAddToWallet || onShare;
 
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const updateOnlineStatus = () => setIsOffline(!navigator.onLine);
+    window.addEventListener("online", updateOnlineStatus);
+    window.addEventListener("offline", updateOnlineStatus);
+    return () => {
+      window.removeEventListener("online", updateOnlineStatus);
+      window.removeEventListener("offline", updateOnlineStatus);
+    };
+  }, []);
+
   // Calculate the highest contrast color (black or white) based on the background color
   const textColor = useMemo(() => {
     try {
@@ -212,13 +224,16 @@ export function Card({
             )}
 
             {onAddToWallet && (
-              <ContextMenuItem onClick={() => onAddToWallet(id)}>
+              <ContextMenuItem
+                disabled={isOffline}
+                onClick={() => onAddToWallet(id)}
+              >
                 <WalletCards />
                 Add to Apple Wallet
               </ContextMenuItem>
             )}
             {onShare && (
-              <ContextMenuItem onClick={() => onShare(id)}>
+              <ContextMenuItem disabled={isOffline} onClick={() => onShare(id)}>
                 <Share />
                 Share
               </ContextMenuItem>

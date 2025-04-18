@@ -185,12 +185,12 @@ export function CardFormModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="p-0 overflow-hidden bg-background text-foreground-900">
-        <DialogHeader className="p-4 border-b bg-foreground-100">
-          <DialogTitle className="text-foreground-800">
+      <DialogContent className="p-0 overflow-hidden bg-background text-foreground gap-0">
+        <DialogHeader className="p-4 border-b">
+          <DialogTitle className="text-foreground">
             {card ? "Edit Card" : "Add a New Card"}
           </DialogTitle>
-          <DialogDescription className="text-foreground-600">
+          <DialogDescription className="text-foreground">
             {card
               ? "Edit the details of your card."
               : "Fill in the details to create a new card."}
@@ -204,10 +204,6 @@ export function CardFormModal({
           >
             <ScrollArea className="max-h-[60vh] flex-grow">
               <div className="space-y-4 p-4">
-                <h2 className="text-sm font-semibold text-foreground-800">
-                  Card Preview
-                </h2>
-
                 {/* Card preview */}
                 <div className="flex justify-center">
                   <Tabs
@@ -263,13 +259,11 @@ export function CardFormModal({
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-foreground-800">
-                        Name
-                      </FormLabel>
+                      <FormLabel className="text-foreground">Name</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="Enter card name"
-                          className="bg-background text-foreground-900"
+                          className="bg-background text-foreground"
                           {...field}
                         />
                       </FormControl>
@@ -283,13 +277,11 @@ export function CardFormModal({
                   name="logo"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-foreground-800">
-                        Logo
-                      </FormLabel>
+                      <FormLabel className="text-foreground">Logo</FormLabel>
                       <FormControl>
                         <Input
                           type="file"
-                          className="bg-background text-foreground-900"
+                          className="bg-background text-foreground"
                           onChange={(e) => {
                             const file = e.target.files?.[0] || null;
                             field.onChange(file);
@@ -307,13 +299,11 @@ export function CardFormModal({
                   name="theme"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-foreground-800">
-                        Theme
-                      </FormLabel>
+                      <FormLabel className="text-foreground">Theme</FormLabel>
                       <FormControl>
                         <ColorPicker
                           placeholder="Choose a color"
-                          className="bg-background text-foreground-900"
+                          className="bg-background text-foreground"
                           {...field}
                         />
                       </FormControl>
@@ -327,13 +317,11 @@ export function CardFormModal({
                   name="code"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-foreground-800">
-                        Code
-                      </FormLabel>
+                      <FormLabel className="text-foreground">Code</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="Enter card code"
-                          className="bg-background text-foreground-900"
+                          className="bg-background text-foreground"
                           {...field}
                         />
                       </FormControl>
@@ -344,13 +332,8 @@ export function CardFormModal({
               </div>
             </ScrollArea>
 
-            <DialogFooter className="p-4 border-t bg-foreground-100">
-              <Button
-                type="button"
-                onClick={handleClose}
-                variant="secondary"
-                className="bg-foreground-200 text-foreground-800"
-              >
+            <DialogFooter className="p-4 border-t">
+              <Button type="button" onClick={handleClose} variant="secondary">
                 Cancel
               </Button>
               <Button variant="default">
