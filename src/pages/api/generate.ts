@@ -76,7 +76,9 @@ export default async function handler(
 ) {
   if (req.method !== "POST") return res.status(405).end("Method Not Allowed");
 
-  const card = req.body as Card;
+  const { platform = "apple", ...card } = req.body as Card & {
+    platform: "google" | "apple";
+  };
 
   try {
     const apiKey = process.env.ADDTOWALLET_API_KEY;
@@ -145,14 +147,28 @@ export default async function handler(
 
     const { cardId } = (await response.json()) as { cardId: string };
 
-    const cardUrl = `${baseUrl}card/${cardId}`;
-    // https://app.addtowallet.co/api/preview/6802617f12cea52495de9917
+    const previewRes = await fetch(`${baseUrl}api/preview/${cardId}`, {
+      headers: {
+        apikey: apiKey,
+      },
+    });
 
-    // Call the preview url and get data.applePassUrl and data.googlePassUrl
-    // Send the pass depending on the system
+    if (!previewRes.ok) {
+      throw new Error(`Failed to fetch preview data: ${previewRes.statusText}`);
+    }
+
+    const previewData = await previewRes.json();
+    const { applePassUrl, googlePassUrl } = previewData.data as {
+      applePassUrl: string;
+      googlePassUrl: string;
+    };
 
     // Response with the card URL
-    res.status(200).json({ cardUrl });
+    if (platform === "google") {
+      res.status(200).json({ cardUrl: googlePassUrl });
+    } else {
+      res.status(200).json({ cardUrl: applePassUrl });
+    }
   } catch (error) {
     res.status(500).json({ error: `Failed to generate pass, ${error}` });
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CardFormModal } from "@/components/CardFormModal";
 import { Carousel } from "@/components/Carousel";
@@ -13,6 +13,48 @@ export default function Home() {
   const [editingCard, setEditingCard] = useState<Card | undefined>(undefined);
   const { cards, getCard, addNewCard, deleteCard, patchCard } =
     useCardStorage();
+
+  const isApple = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const ua = window.navigator.userAgent.toLowerCase();
+    return /iphone|ipad|ipod|macintosh/.test(ua);
+  }, []);
+
+  const addToWallet = useCallback(
+    (id: Card["id"]) => {
+      getCard(id).then((card) => {
+        if (card) {
+          fetch("/api/generate", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              platform: isApple ? "apple" : "google",
+              ...card,
+            }),
+          })
+            .then((response) => {
+              if (!response.ok) {
+                return response.json().then((err) => {
+                  throw new Error(err.error || "Failed to generate pass");
+                });
+              }
+              return response.json();
+            })
+            .then((data) => {
+              const { cardUrl } = data;
+              window.location.href = cardUrl;
+            })
+            .catch((error) => {
+              console.error("Error generating pass:", error);
+              alert(`Error: ${error.message}`);
+            });
+        }
+      });
+    },
+    [getCard, isApple],
+  );
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
@@ -45,35 +87,7 @@ export default function Home() {
           setEditingCard(card);
           setIsModalOpen(true);
         }}
-        onAddToWallet={(id) => {
-          getCard(id).then((card) => {
-            if (card) {
-              fetch("/api/generate", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify(card),
-              })
-                .then((response) => {
-                  if (!response.ok) {
-                    return response.json().then((err) => {
-                      throw new Error(err.error || "Failed to generate pass");
-                    });
-                  }
-                  return response.json();
-                })
-                .then((data) => {
-                  const { cardUrl } = data;
-                  window.location.href = cardUrl;
-                })
-                .catch((error) => {
-                  console.error("Error generating pass:", error);
-                  alert(`Error: ${error.message}`);
-                });
-            }
-          });
-        }}
+        onAddToWallet={addToWallet}
         onShare={(id) => console.log("Share", id)}
       />
     </div>

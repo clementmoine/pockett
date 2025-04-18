@@ -46,3 +46,4 @@ certificates
 # Serwist
 public/sw*
 public/swe-worker*
+public/workbox-*.js

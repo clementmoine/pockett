@@ -128,7 +128,7 @@ export function Card({
       <ContextMenu>
         <ContextMenuTrigger disabled={!hasActions}>
           <motion.div
-            className="relative w-64 h-40 cursor-pointer"
+            className="relative w-64 h-40 cursor-pointer select-none"
             onClick={() => setIsFlipped(!isFlipped)} // Toggle flip state on click
           >
             {/* Card Inner */}
