@@ -1,10 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
 import { motion } from "framer-motion";
+import color from "color";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -37,6 +38,7 @@ export function Card({
   logo,
   theme,
   code,
+  barcodeType,
   id,
   onDeleteCard,
   onEditCard,
@@ -44,24 +46,35 @@ export function Card({
   onShare,
 }: CardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false); // Manage dialog open state
-  const [isDeleting, setIsDeleting] = useState(false); // Manage delete action state
-  const [codeDataUrl, setCodeDataUrl] = useState<string | null>(null); // Store the code as a Base64 image URL
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [codeDataUrl, setCodeDataUrl] = useState<string | null>(null);
 
-  const hasActions = onEditCard || onDeleteCard || onAddToWallet || onShare; // Check if any actions are available
+  const hasActions = onEditCard || onDeleteCard || onAddToWallet || onShare;
+
+  // Calculate the highest contrast color (black or white) based on the background color
+  const textColor = useMemo(() => {
+    try {
+      return color(theme || "#FFF").isLight() ? "text-black" : "text-white";
+    } catch {
+      return "text-black"; // Fallback to black if the color is invalid
+    }
+  }, [theme]);
 
   // Generate the code as a Base64 image URL
   useEffect(() => {
     const generateCode = async () => {
       const parsedCode = code.replace(/[^a-zA-Z0-9]/g, "");
 
-      // Check if the code is not empty
       if (!parsedCode) {
         setCodeDataUrl(null);
         return;
       }
 
-      if (parsedCode.length > 26) {
+      if (
+        (barcodeType == "auto" && parsedCode.length > 26) ||
+        barcodeType == "qr"
+      ) {
         // Use QR code for larger data
         const qrCodeUrl = await QRCode.toDataURL(parsedCode, {
           width: 128,
@@ -82,10 +95,10 @@ export function Card({
     };
 
     generateCode();
-  }, [code]);
+  }, [code, barcodeType]);
 
   const handleDelete = async () => {
-    if (!onDeleteCard) return; // If no delete function is provided, do nothing
+    if (!onDeleteCard) return;
 
     setIsDeleting(true);
     try {
@@ -110,15 +123,15 @@ export function Card({
             <div
               className={`absolute inset-0 transition-transform duration-500`}
               style={{
-                transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)", // Rotate based on flip state
-                transformStyle: "preserve-3d", // Enable 3D transform
+                transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+                transformStyle: "preserve-3d",
               }}
             >
               {/* Front Side */}
               <div
                 className="absolute inset-0 flex flex-col gap-2 items-center justify-center rounded-lg shadow-lg backface-hidden"
                 style={{
-                  backgroundColor: theme,
+                  backgroundColor: theme || "#FFF",
                 }}
               >
                 {logo ? (
@@ -130,11 +143,11 @@ export function Card({
                     className="h-16 w-16 object-contain"
                   />
                 ) : (
-                  <span className="text-neutral-950 text-lg font-bold">
+                  <span className={`text-lg font-bold ${textColor}`}>
                     No Logo
                   </span>
                 )}
-                <span className="text-sm text-slate-950 text-center w-full">
+                <span className={`text-sm text-center w-full ${textColor}`}>
                   {name.trim().length > 1 ? name : "N/A"}
                 </span>
               </div>
@@ -143,7 +156,7 @@ export function Card({
               <div
                 className="absolute inset-0 flex flex-col gap-2 px-2 items-center justify-center rounded-lg shadow-lg backface-hidden transform rotate-y-180"
                 style={{
-                  backgroundColor: theme,
+                  backgroundColor: theme || "#FFF",
                 }}
               >
                 {logo ? (
@@ -155,24 +168,26 @@ export function Card({
                     className="h-6 w-6 object-contain"
                   />
                 ) : (
-                  <span className="text-neutral-950 text-sm font-bold">
+                  <span className={`text-sm font-bold ${textColor}`}>
                     No Logo
                   </span>
                 )}
 
                 {/* Code (Barcode or QR Code) */}
-                <div className="flex flex-col bg-white rounded-md p-2 overflow-hidden w-full gap-2">
-                  {codeDataUrl != null && (
+                <div className="flex flex-col bg-background rounded-md p-2 overflow-hidden w-full gap-2">
+                  {codeDataUrl != null ? (
                     <Image
                       width={128}
-                      height={128}
+                      height={64}
                       src={codeDataUrl}
                       alt="Code"
-                      className="h-16 w-full object-contain"
+                      className="h-16 w-full object-contain shrink-0"
                     />
+                  ) : (
+                    <div className="h-16 w-full" />
                   )}
 
-                  <span className="text-sm text-slate-950 font-mono text-center w-full truncate">
+                  <span className="text-sm text-foreground font-mono text-center w-full truncate">
                     {code.trim().length > 1 ? code : "N/A"}
                   </span>
                 </div>
@@ -182,7 +197,7 @@ export function Card({
         </ContextMenuTrigger>
 
         {hasActions && (
-          <ContextMenuContent className="bg-neutral-50 rounded-md shadow-md p-2">
+          <ContextMenuContent className="rounded-md shadow-md p-2">
             {onEditCard && (
               <ContextMenuItem onClick={onEditCard}>Edit</ContextMenuItem>
             )}
@@ -223,10 +238,13 @@ export function Card({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setIsDialogOpen(false)}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-red-500 dark:bg-red-600 hover:bg-red-600 dark:hover:bg-red-800 text-white"
+            >
               {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>

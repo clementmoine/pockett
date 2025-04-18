@@ -1,11 +1,20 @@
 "use client";
 
-import React, { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { Card } from "@/components/Card";
-import { Button } from "@/components/ui/button";
 import type { Card as CardType } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationPrevious,
+  PaginationNext,
+  PaginationLink,
+  PaginationEllipsis,
+} from "@/components/ui/pagination";
+import { GalleryVerticalEnd } from "lucide-react";
 
 export function Carousel({
   cards,
@@ -26,20 +35,39 @@ export function Carousel({
     containScroll: "trimSnaps", // Ensure the visible area is respected
   });
 
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const getRealIndex = (clonedIndex: number) => {
+    if (clonedCards.length <= 1) return 0;
+    if (clonedIndex === cards.length) return 0;
+    if (clonedIndex === cards.length + 1) return cards.length - 1;
+    return clonedIndex;
+  };
+
+  // Update the selected index when the carousel scrolls
+  const onSelect = useCallback(() => {
+    if (emblaApi) {
+      setSelectedIndex(emblaApi.selectedScrollSnap());
+    }
+  }, [emblaApi]);
+
+  // Attach the `onSelect` callback to the carousel
+  useEffect(() => {
+    if (emblaApi) {
+      emblaApi.on("select", onSelect);
+    }
+  }, [emblaApi, onSelect]);
+
   // Clone the first and last cards for seamless looping
   const clonedCards = useMemo(() => {
     if (cards.length > 1) {
-      return [cards[cards.length - 1], ...cards, cards[0]];
+      return [...cards, cards[0], cards[cards.length - 1]];
     }
     return cards; // No need to clone if there's only one card
   }, [cards]);
 
-  const scrollPrev = () => {
-    if (emblaApi) emblaApi.scrollPrev();
-  };
-
-  const scrollNext = () => {
-    if (emblaApi) emblaApi.scrollNext();
+  const scrollTo = (index: number) => {
+    if (emblaApi) emblaApi.scrollTo(index);
   };
 
   return (
@@ -67,10 +95,57 @@ export function Carousel({
           ))}
         </div>
       </div>
-      <div className="flex gap-2 mt-4">
-        <Button onClick={scrollPrev}>Previous</Button>
-        <Button onClick={scrollNext}>Next</Button>
-      </div>
+
+      {/* Empty state */}
+      {cards.length === 0 && (
+        <div className="flex flex-col items-center justify-center h-full">
+          <GalleryVerticalEnd className="h-16 w-16 text-foreground-500 mb-5" />
+          <p className="text-foreground-500 text-center">No cards available</p>
+          <p className="text-foreground-500 text-center">
+            Add a new card to get started
+          </p>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {cards.length > 1 && (
+        <div className="flex justify-center m-4">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={() => emblaApi?.scrollPrev()}
+                />
+              </PaginationItem>
+
+              {cards.map((_, index) => {
+                const isSelected = index === getRealIndex(selectedIndex);
+
+                return (
+                  <PaginationItem key={index}>
+                    <PaginationLink
+                      onClick={() => scrollTo(index)}
+                      isActive={isSelected}
+                    >
+                      {index + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              })}
+
+              {cards.length > 5 && <PaginationEllipsis />}
+
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={() => emblaApi?.scrollNext()}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </>
   );
 }

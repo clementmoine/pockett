@@ -6,6 +6,7 @@ import { CardFormModal } from "@/components/CardFormModal";
 import { Carousel } from "@/components/Carousel";
 import { useCardStorage } from "@/lib/useCardStorage";
 import { Card } from "@/lib/types";
+import { GalleryVerticalEnd } from "lucide-react";
 
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -14,8 +15,17 @@ export default function Home() {
     useCardStorage();
 
   return (
-    <div className="flex overflow-hidden flex-col h-screen">
-      <Button onClick={() => setIsModalOpen(true)}>Add card</Button>
+    <div className="flex flex-col h-screen bg-background text-foreground-900">
+      {/* Header */}
+      <header className="flex items-center justify-between p-4 border-b bg-background shadow-sm">
+        <div className="flex items-center gap-2">
+          <GalleryVerticalEnd className="h-6 w-6 text-foreground-700" />
+          <h1 className="text-lg font-semibold text-foreground-800">Pockett</h1>
+        </div>
+        <Button onClick={() => setIsModalOpen(true)}>Add card</Button>
+      </header>
+
+      {/* Card Form Modal */}
       <CardFormModal
         isOpen={isModalOpen}
         onClose={() => {
@@ -23,9 +33,11 @@ export default function Home() {
           setEditingCard(undefined);
         }}
         onAddCard={addNewCard}
-        onEditCard={patchCard} // Pass patchCard directly
+        onEditCard={patchCard}
         card={editingCard}
       />
+
+      {/* Carousel */}
       <Carousel
         cards={cards}
         onDeleteCard={deleteCard}
@@ -36,10 +48,6 @@ export default function Home() {
         onAddToWallet={(id) => {
           getCard(id).then((card) => {
             if (card) {
-              // Logic to handle adding the card to Apple Wallet
-              console.log("Add to Wallet", card);
-              // Call the /api/generate endpoint with the card data and open the pass
-              // in Apple Wallet
               fetch("/api/generate", {
                 method: "POST",
                 headers: {
@@ -59,10 +67,9 @@ export default function Home() {
                   const { cardUrl } = data;
                   window.location.href = cardUrl;
                 })
-                // Handle errors
                 .catch((error) => {
                   console.error("Error generating pass:", error);
-                  alert(`Error: ${error.message}`); // Display error to the user
+                  alert(`Error: ${error.message}`);
                 });
             }
           });

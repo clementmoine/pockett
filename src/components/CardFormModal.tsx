@@ -24,9 +24,12 @@ import {
 } from "@/components/ui/dialog";
 import type { Card as CardType } from "@/lib/types";
 import { Card } from "@/components/Card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { v4 as uuidv4 } from "uuid";
-import { createHash } from "crypto"; // Import crypto for hashing
+import { createHash } from "crypto";
+import color from "color";
+import { ColorPicker } from "./ColorPicker";
 
 const cardSchema = z.object({
   name: z
@@ -42,30 +45,42 @@ const cardSchema = z.object({
   logo: z
     .any()
     .refine(
-      (file) => file instanceof File || file === null,
+      (file) =>
+        file instanceof File ||
+        file === null ||
+        (typeof file === "string" &&
+          /^data:image\/[a-zA-Z]+;base64,[^\s]+$/.test(file)),
       "Invalid file type",
     ),
   theme: z
     .string()
     .trim()
     .min(1, "Theme is required")
-    .refine((value) => value.trim().length > 0, "Theme cannot be empty spaces"),
+    .refine((value) => {
+      try {
+        color(value);
+        return true;
+      } catch {
+        return false;
+      }
+    }, "Invalid color format"),
+  barcodeType: z.enum(["auto", "qr", "barcode"]).default("auto"),
 });
 
 type CardFormValues = z.infer<typeof cardSchema>;
 
 const generateNumericId = () => {
-  const uuid = uuidv4(); // Generate a UUID
-  const hash = createHash("sha256").update(uuid).digest("hex"); // Hash the UUID
-  return parseInt(hash.slice(0, 12), 16); // Convert a portion of the hash to a number
+  const uuid = uuidv4();
+  const hash = createHash("sha256").update(uuid).digest("hex");
+  return parseInt(hash.slice(0, 12), 16);
 };
 
 const convertFileToBase64 = async (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string); // Convert file to base64
+    reader.onload = () => resolve(reader.result as string);
     reader.onerror = (error) => reject(error);
-    reader.readAsDataURL(file); // Read the file as a Data URL
+    reader.readAsDataURL(file);
   });
 };
 
@@ -79,20 +94,21 @@ export function CardFormModal({
   isOpen: boolean;
   onClose: () => void;
   onAddCard: (card: CardType) => Promise<void>;
-  onEditCard?: (card: CardType) => Promise<void>; // Optional for editing
-  card?: CardType; // Optional card to edit
+  onEditCard?: (card: CardType) => Promise<void>;
+  card?: CardType;
 }) {
   const [logoPreview, setLogoPreview] = useState<string | null>(
     card?.logo || null,
   );
 
-  const form = useForm<CardFormValues>({
+  const form = useForm({
     resolver: zodResolver(cardSchema),
     defaultValues: {
       name: "",
       code: "",
       logo: null,
       theme: "",
+      barcodeType: "auto",
     },
   });
 
@@ -104,8 +120,9 @@ export function CardFormModal({
       reset({
         name: card.name || "",
         code: card.code || "",
-        logo: card.logo || null, // Pre-fill with dataUri if available
+        logo: card.logo || null,
         theme: card.theme || "",
+        barcodeType: card.barcodeType || "",
       });
       setLogoPreview(card.logo || null);
     } else {
@@ -114,6 +131,7 @@ export function CardFormModal({
         code: "",
         logo: null,
         theme: "",
+        barcodeType: "auto",
       });
       setLogoPreview(null);
     }
@@ -134,16 +152,17 @@ export function CardFormModal({
   };
 
   const handleSubmit = async (values: CardFormValues) => {
-    let logo: string | null = null;
-    if (values.logo) {
+    let logo: string | null = values.logo;
+    if (values.logo && values.logo instanceof File) {
       logo = await convertFileToBase64(values.logo);
     }
 
     const updatedCard: CardType = {
-      id: card ? card.id : generateNumericId(), // Generate a numeric ID if not editing
+      barcodeType: values.barcodeType,
+      id: card ? card.id : generateNumericId(),
       name: values.name,
-      code: values.code, // Use `code` instead of `id`
-      logo: logo, // Store the base64 string directly
+      code: values.code,
+      logo: logo,
       theme: values.theme,
     };
 
@@ -159,17 +178,19 @@ export function CardFormModal({
   };
 
   const handleClose = () => {
-    reset(); // Reset the form when the modal is closed
-    setLogoPreview(null); // Clear the logo preview
+    reset();
+    setLogoPreview(null);
     onClose();
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="p-0 overflow-hidden">
-        <DialogHeader className="p-4 border-b">
-          <DialogTitle>{card ? "Edit Card" : "Add a New Card"}</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="p-0 overflow-hidden bg-background text-foreground-900">
+        <DialogHeader className="p-4 border-b bg-foreground-100">
+          <DialogTitle className="text-foreground-800">
+            {card ? "Edit Card" : "Add a New Card"}
+          </DialogTitle>
+          <DialogDescription className="text-foreground-600">
             {card
               ? "Edit the details of your card."
               : "Fill in the details to create a new card."}
@@ -183,18 +204,58 @@ export function CardFormModal({
           >
             <ScrollArea className="max-h-[60vh] flex-grow">
               <div className="space-y-4 p-4">
-                {/* Add spacing between fields */}
-                {/* Title for preview section */}
-                <h2 className="text-sm font-semibold">Card Preview</h2>
+                <h2 className="text-sm font-semibold text-foreground-800">
+                  Card Preview
+                </h2>
+
                 {/* Card preview */}
                 <div className="flex justify-center">
-                  <Card
-                    id={-1}
-                    name={form.watch("name")}
-                    theme={form.watch("theme")}
-                    logo={logoPreview || null}
-                    code={form.watch("code")} // Display the code
-                  />
+                  <Tabs
+                    value={form.watch("barcodeType")}
+                    defaultValue={form.watch("barcodeType")}
+                    onValueChange={(value) =>
+                      form.setValue(
+                        "barcodeType",
+                        value as "auto" | "qr" | "barcode",
+                      )
+                    }
+                  >
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="auto">Auto</TabsTrigger>
+                      <TabsTrigger value="qr">QR Code</TabsTrigger>
+                      <TabsTrigger value="barcode">Barcode</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="auto">
+                      <Card
+                        id={-1}
+                        barcodeType="auto"
+                        name={form.watch("name")}
+                        theme={form.watch("theme")}
+                        logo={logoPreview || null}
+                        code={form.watch("code")}
+                      />
+                    </TabsContent>
+                    <TabsContent value="qr">
+                      <Card
+                        id={-1}
+                        barcodeType="qr"
+                        name={form.watch("name")}
+                        theme={form.watch("theme")}
+                        logo={logoPreview || null}
+                        code={form.watch("code")}
+                      />
+                    </TabsContent>
+                    <TabsContent value="barcode">
+                      <Card
+                        id={-1}
+                        barcodeType="barcode"
+                        name={form.watch("name")}
+                        theme={form.watch("theme")}
+                        logo={logoPreview || null}
+                        code={form.watch("code")}
+                      />
+                    </TabsContent>
+                  </Tabs>
                 </div>
 
                 <FormField
@@ -202,9 +263,15 @@ export function CardFormModal({
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Name</FormLabel>
+                      <FormLabel className="text-foreground-800">
+                        Name
+                      </FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter card name" {...field} />
+                        <Input
+                          placeholder="Enter card name"
+                          className="bg-background text-foreground-900"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -216,10 +283,13 @@ export function CardFormModal({
                   name="logo"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Logo</FormLabel>
+                      <FormLabel className="text-foreground-800">
+                        Logo
+                      </FormLabel>
                       <FormControl>
                         <Input
                           type="file"
+                          className="bg-background text-foreground-900"
                           onChange={(e) => {
                             const file = e.target.files?.[0] || null;
                             field.onChange(file);
@@ -237,9 +307,15 @@ export function CardFormModal({
                   name="theme"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Theme</FormLabel>
+                      <FormLabel className="text-foreground-800">
+                        Theme
+                      </FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter card theme" {...field} />
+                        <ColorPicker
+                          placeholder="Choose a color"
+                          className="bg-background text-foreground-900"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -251,9 +327,15 @@ export function CardFormModal({
                   name="code"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Code</FormLabel>
+                      <FormLabel className="text-foreground-800">
+                        Code
+                      </FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter card code" {...field} />
+                        <Input
+                          placeholder="Enter card code"
+                          className="bg-background text-foreground-900"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -262,11 +344,16 @@ export function CardFormModal({
               </div>
             </ScrollArea>
 
-            <DialogFooter className="p-4 border-t">
-              <Button type="button" onClick={handleClose} variant="secondary">
+            <DialogFooter className="p-4 border-t bg-foreground-100">
+              <Button
+                type="button"
+                onClick={handleClose}
+                variant="secondary"
+                className="bg-foreground-200 text-foreground-800"
+              >
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button variant="default">
                 {card ? "Save Changes" : "Add Card"}
               </Button>
             </DialogFooter>

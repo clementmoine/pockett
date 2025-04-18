@@ -1,12 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import color from "color"; // Add this import
-import sharp from "sharp"; // Add sharp for image conversion
-import { dataUriToBuffer } from "data-uri-to-buffer"; // Import dataUriToBuffer
+import color from "color";
+import sharp from "sharp";
+import { dataUriToBuffer } from "data-uri-to-buffer";
+import { Card } from "@/lib/types";
 
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: "10mb", // Useful if you pass a logo in base64
+      sizeLimit: "10mb",
     },
   },
 };
@@ -16,7 +17,7 @@ function formatColorToRgba(inputColor: string): string {
     return color(inputColor.toLowerCase()).hex();
   } catch (error) {
     console.error(`Invalid color format: ${inputColor}`, error);
-    return "#FFF"; // Default to white if the color is invalid
+    return "#FFF";
   }
 }
 
@@ -75,13 +76,7 @@ export default async function handler(
 ) {
   if (req.method !== "POST") return res.status(405).end("Method Not Allowed");
 
-  const card = req.body as {
-    name: string;
-    id: number;
-    code: string;
-    logo: string | null;
-    theme: string;
-  };
+  const card = req.body as Card;
 
   try {
     const apiKey = process.env.ADDTOWALLET_API_KEY;
@@ -102,10 +97,17 @@ export default async function handler(
 
     // Code to be used for the barcode
     const parsedCode = card.code.replace(/[^a-zA-Z0-9]/g, "");
-    const type = parsedCode.length > 26 ? "QR_CODE" : "CODE_128";
+    const barcodeType =
+      (card.barcodeType === "auto" && parsedCode.length > 26) ||
+      card.barcodeType == "qr"
+        ? "QR_CODE"
+        : "CODE_128";
 
     // Format the theme color to RGBA
     const formattedTheme = formatColorToRgba(card.theme);
+
+    // Set the text color based on the theme color
+    const textColor = color(card.theme).isLight() ? "#000000" : "#FFFFFF";
 
     // Call the Create Card API using fetch
     const response = await fetch(`${baseUrl}api/card/create`, {
@@ -122,11 +124,11 @@ export default async function handler(
         header: card.name,
         textModulesData: [],
         linksModuleData: [],
-        barcodeType: type,
+        barcodeType: barcodeType,
         barcodeValue: parsedCode,
         barcodeAltText: parsedCode,
         hexBackgroundColor: formattedTheme,
-        appleFontColor: "#FFFFFF",
+        appleFontColor: textColor,
         changedAppleFontColor: false,
         stateType: "ACTIVE",
         subheader: "",
