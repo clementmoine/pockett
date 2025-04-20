@@ -76,9 +76,10 @@ export default async function handler(
 ) {
   if (req.method !== "POST") return res.status(405).end("Method Not Allowed");
 
-  const { platform = "apple", ...card } = req.body as Card & {
-    platform: "google" | "apple";
-  };
+  const { platform = process.env.TARGET || "apple", ...card } =
+    req.body as Card & {
+      platform: "google" | "apple";
+    };
 
   try {
     const apiKey = process.env.ADDTOWALLET_API_KEY;
@@ -99,17 +100,16 @@ export default async function handler(
 
     // Code to be used for the barcode
     const parsedCode = card.code.replace(/[^a-zA-Z0-9]/g, "");
-    const barcodeType =
-      (card.barcodeType === "auto" && parsedCode.length > 26) ||
-      card.barcodeType == "qr"
+    const type =
+      (card.type === "auto" && parsedCode.length > 26) || card.type == "qr"
         ? "QR_CODE"
         : "CODE_128";
 
-    // Format the theme color to RGBA
-    const formattedTheme = formatColorToRgba(card.theme);
+    // Format the color to RGBA
+    const formattedColor = formatColorToRgba(card.color);
 
-    // Set the text color based on the theme color
-    const textColor = color(card.theme).isLight() ? "#000000" : "#FFFFFF";
+    // Set the text color based on the color
+    const textColor = color(card.color).isLight() ? "#000000" : "#FFFFFF";
 
     // Call the Create Card API using fetch
     const response = await fetch(`${baseUrl}api/card/create`, {
@@ -126,10 +126,10 @@ export default async function handler(
         header: card.name,
         textModulesData: [],
         linksModuleData: [],
-        barcodeType: barcodeType,
+        barcodeType: type,
         barcodeValue: parsedCode,
         barcodeAltText: parsedCode,
-        hexBackgroundColor: formattedTheme,
+        hexBackgroundColor: formattedColor,
         appleFontColor: textColor,
         changedAppleFontColor: false,
         stateType: "ACTIVE",
