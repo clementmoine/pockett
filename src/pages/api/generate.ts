@@ -163,12 +163,20 @@ export default async function handler(
       googlePassUrl: string;
     };
 
-    // Response with the card URL
-    if (platform === "google") {
-      res.status(200).json({ cardUrl: googlePassUrl });
-    } else {
-      res.status(200).json({ cardUrl: applePassUrl });
+    const deleteResponse = await fetch(`${baseUrl}api/card/delete/${cardId}`, {
+      method: "DELETE",
+      headers: {
+        apikey: apiKey,
+      },
+    });
+
+    if (!deleteResponse.ok) {
+      console.error("Error deleting card:", deleteResponse);
     }
+
+    const cardUrl = platform === "google" ? googlePassUrl : applePassUrl;
+
+    res.status(200).json({ cardUrl });
   } catch (error) {
     res.status(500).json({ error: `Failed to generate pass, ${error}` });
   }
