@@ -5,6 +5,8 @@ import type { Card as CardType } from "@/lib/types";
 import { GalleryVerticalEnd } from "lucide-react";
 import { useMemo } from "react";
 
+import styles from "./Cards.module.css";
+
 export function Cards({
   cards = [],
   onDeleteCard,
@@ -36,7 +38,7 @@ export function Cards({
         Your Cards ({cards.length})
       </h2>
 
-      <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7">
+      <div className={styles.gridResponsive}>
         {sortedCards.map((card, index) => (
           <Card
             key={`${card.id}-${index}`}
