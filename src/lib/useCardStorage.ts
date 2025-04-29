@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import localforage from "localforage";
-import { Card } from "./types";
+
+import { Card } from "@/lib/types";
 
 const CARD_STORAGE_KEY = "cards";
 

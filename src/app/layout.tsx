@@ -1,48 +1,52 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+
 import { ThemeProvider } from "@/components/theme-provider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+import "./globals.css";
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const APP_NAME = "Pockett - Loyalty Cards";
+const APP_DESCRIPTION = "All your loyalty cards, always in your pocket.";
 
 export const metadata: Metadata = {
-  applicationName: "Pockett - Loyalty Cards",
-  title: "Pockett - Loyalty Cards",
-  description: "All your loyalty cards, always in your pocket.",
-  category: "website",
-  generator: "Next.js",
+  applicationName: APP_NAME,
+  title: {
+    default: APP_NAME,
+    template: "%s - NJS App",
+  },
+  description: APP_DESCRIPTION,
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
+    title: APP_NAME,
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    shortcut: "/favicon.ico",
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
   },
 };
 
 export const viewport: Viewport = {
   themeColor: "#FFFFFF",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+  eaDir: string; // Prevent error on build (no idea what this is)
+}) {
   return (
+    // Suppress hydration warning for the html tag due to the theme provider
     <html lang="en" dir="ltr" suppressHydrationWarning>
-      <head>
-        <meta name="apple-mobile-web-app-title" content="Pockett" />
-      </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

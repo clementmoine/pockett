@@ -1,9 +1,11 @@
 "use client";
 
-import { Card } from "@/components/Card";
-import type { Card as CardType } from "@/lib/types";
-import { GalleryVerticalEnd } from "lucide-react";
 import { useMemo } from "react";
+import { GalleryVerticalEnd } from "lucide-react";
+
+import { Card } from "@/components/Card";
+
+import type { Card as CardType } from "@/lib/types";
 
 import styles from "./Cards.module.css";
 

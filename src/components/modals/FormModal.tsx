@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { v4 as uuidv4 } from "uuid";
+import { createHash } from "crypto";
+import color from "color";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,13 +26,11 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import type { Card as CardType } from "@/lib/types";
 import { Card } from "@/components/Card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { v4 as uuidv4 } from "uuid";
-import { createHash } from "crypto";
-import color from "color";
-import { ColorPicker } from "../ColorPicker";
+import { ColorPicker } from "@/components/ColorPicker";
+
+import type { Card as CardType } from "@/lib/types";
 
 const cardSchema = z.object({
   name: z

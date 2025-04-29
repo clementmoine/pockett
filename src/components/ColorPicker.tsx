@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Paintbrush } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Paintbrush } from "lucide-react";
 
 export function ColorPicker({
   value,

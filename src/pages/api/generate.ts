@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import color from "color";
 import sharp from "sharp";
 import { dataUriToBuffer } from "data-uri-to-buffer";
+
 import { Card } from "@/lib/types";
 
 export const config = {

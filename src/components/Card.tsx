@@ -4,8 +4,10 @@ import Image from "next/image";
 import { useState, useEffect, useMemo } from "react";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
+import { Share, WalletCards } from "lucide-react";
 import { motion } from "framer-motion";
 import color from "color";
+
 import {
   ContextMenu,
   ContextMenuContent,
@@ -23,8 +25,8 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+
 import type { Card as CardType } from "@/lib/types";
-import { Share, WalletCards } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface CardProps extends CardType {
@@ -153,7 +155,8 @@ export function Card({
                     width={128}
                     height={128}
                     alt="Card Logo"
-                    className="h-1/2 w-1/2 object-contain"
+                    className="h-1/2 w-1/2 object-contain select-none"
+                    draggable={false}
                   />
                 ) : (
                   <span className={`text-lg font-bold ${textColor}`}>
@@ -178,7 +181,8 @@ export function Card({
                     width={128}
                     height={128}
                     alt="Card Logo"
-                    className="h-2 w-auto shrink-0 object-contain"
+                    className="h-2 w-auto shrink-0 object-contain select-none"
+                    draggable={false}
                   />
                 ) : (
                   <span className={`text-sm font-bold ${textColor}`}>
@@ -194,9 +198,13 @@ export function Card({
                       height={64}
                       src={codeDataUrl}
                       alt="Code"
-                      className={cn("w-full h-full overflow-hidden", {
-                        "object-contain": type == "qr",
-                      })}
+                      className={cn(
+                        "w-full h-full overflow-hidden  select-none",
+                        {
+                          "object-contain": type == "qr",
+                        },
+                      )}
+                      draggable={false}
                     />
                   ) : (
                     <div className="h-16 w-full" />
