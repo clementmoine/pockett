@@ -85,7 +85,7 @@ export function ImportModal({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="flex flex-col p-0 overflow-hidden bg-background text-foreground gap-0 max-h-[90vh]">
         <DialogHeader className="p-4 border-b shrink-0">
-          <DialogTitle className="text-foreground">Import Cards</DialogTitle>
+          <DialogTitle className="text-foreground">Import cards</DialogTitle>
           <DialogDescription className="text-foreground">
             Paste the JSON data of the cards you want to import.
           </DialogDescription>
@@ -96,7 +96,7 @@ export function ImportModal({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="flex flex-col overflow-hidden"
           >
-            <div className="max-h-[60vh] overflow-auto flex-grow space-y-4 p-4">
+            <div className="max-h-[60vh] overflow-auto space-y-4 p-4">
               <FormField
                 control={form.control}
                 name="json"

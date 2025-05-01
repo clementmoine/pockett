@@ -31,6 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ColorPicker } from "@/components/ColorPicker";
 
 import type { Card as CardType } from "@/lib/types";
+import { toast } from "sonner";
 
 const cardSchema = z.object({
   name: z
@@ -173,6 +174,14 @@ export function FormModal({
       await onAddCard(updatedCard);
     }
 
+    // Toast success message
+    if (card) {
+      toast.success(`${card.name} card updated successfully`);
+    }
+    if (!card) {
+      toast.success(`${updatedCard.name} card added successfully`);
+    }
+
     handleClose();
   };
 
@@ -187,7 +196,7 @@ export function FormModal({
       <DialogContent className="flex flex-col p-0 overflow-hidden bg-background text-foreground gap-0 max-h-[90vh]">
         <DialogHeader className="p-4 border-b shrink-0">
           <DialogTitle className="text-foreground">
-            {card ? "Edit Card" : "Add a New Card"}
+            {card ? "Edit card" : "Add a new card"}
           </DialogTitle>
           <DialogDescription className="text-foreground">
             {card
@@ -218,7 +227,7 @@ export function FormModal({
                   </TabsList>
                   <TabsContent value="auto">
                     <Card
-                      id={-1}
+                      id={card?.id || -1}
                       type="auto"
                       name={form.watch("name")}
                       color={form.watch("color")}

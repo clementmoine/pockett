@@ -28,6 +28,7 @@ import {
 
 import type { Card as CardType } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export interface CardProps extends CardType {
   onDeleteCard?: (id: CardType["id"]) => Promise<void>;
@@ -116,8 +117,10 @@ export function Card({
     try {
       await onDeleteCard(id);
       setIsDialogOpen(false);
+      toast.success(`${name} card deleted successfully`);
     } catch (error) {
       console.error("Failed to delete card:", error);
+      toast.error("Failed to delete card");
     } finally {
       setIsDeleting(false);
     }

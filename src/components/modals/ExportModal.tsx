@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-
+import { useEffect } from "react";
+import { ClipboardCopy } from "lucide-react";
+import { z } from "zod";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -13,6 +15,38 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import type { Card as CardType } from "@/lib/types";
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+  Form,
+} from "@/components/ui/form"; // Adjust the path based on your project structure
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+const importSchema = z.object({
+  json: z
+    .string()
+    .trim()
+    .min(1, { message: "JSON data is required" })
+    .refine(
+      (data) => {
+        try {
+          const parsed = JSON.parse(data);
+          return Array.isArray(parsed);
+        } catch {
+          return false;
+        }
+      },
+      {
+        message: "Invalid JSON format or not an array of cards",
+      },
+    ),
+});
+
+type FormValues = z.infer<typeof importSchema>;
 
 export function ExportModal({
   cards,
@@ -23,52 +57,98 @@ export function ExportModal({
   onClose: () => void;
   cards?: CardType[];
 }) {
+  const form = useForm<FormValues>({
+    resolver: zodResolver(importSchema),
+    defaultValues: {
+      json: "",
+    },
+  });
+
+  const { reset, getValues } = form;
+
   const handleClose = () => {
+    reset();
     onClose();
   };
 
-  const formattedCard = useMemo(() => {
-    if (!cards) return "";
-    return JSON.stringify(cards, null, 2);
-  }, [cards]);
-
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const handleCopyToClipboard = () => {
+    const json = getValues("json");
+    navigator.clipboard.writeText(json).then(
+      () => {
+        toast.success(
+          `${cards?.length ?? 0} card${(cards?.length ?? 0) > 1 ? "s" : ""} copied to clipboard`,
+        );
+      },
+      (err) => {
+        console.error("Could not copy text: ", err);
+        toast.error("Failed to copy to clipboard");
+      },
+    );
+  };
 
   useEffect(() => {
-    if (isOpen) {
+    if (cards) {
+      const formattedCard = JSON.stringify(cards, null, 2);
+      reset({ json: formattedCard });
       setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.select();
+        const textarea = document.querySelector("textarea");
+        if (textarea) {
+          textarea.select();
         }
       }, 0);
     }
-  }, [isOpen]);
+  }, [isOpen, cards, reset]);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="flex flex-col p-0 overflow-hidden bg-background text-foreground gap-0 max-h-[90vh]">
         <DialogHeader className="p-4 border-b shrink-0">
-          <DialogTitle className="text-foreground">Share Cards</DialogTitle>
+          <DialogTitle className="text-foreground">Share cards</DialogTitle>
           <DialogDescription className="text-foreground">
             Copy the JSON data below and share it with your friends. They can
             import it into their own Pockett app.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex overflow-auto space-y-4 p-4 h-[60vh]">
-          <Textarea
-            ref={textareaRef}
-            className="w-full"
-            readOnly
-            value={formattedCard}
-          />
-        </div>
+        <Form {...form}>
+          <form className="flex flex-col overflow-hidden">
+            <div className="max-h-[60vh] overflow-auto space-y-4 p-4">
+              <FormField
+                name="json"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center justify-between">
+                      <FormLabel className="text-foreground">JSON</FormLabel>
+                      <Button
+                        type="button"
+                        onClick={handleCopyToClipboard}
+                        variant="link"
+                      >
+                        <ClipboardCopy />
+                        Copy to clipboard
+                      </Button>
+                    </div>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Paste card data here..."
+                        className="w-full h-40 p-2 border rounded bg-background text-foreground"
+                        {...field}
+                        readOnly
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-        <DialogFooter className="p-4 border-t shrink-0">
-          <Button type="button" onClick={handleClose} variant="default">
-            Ok
-          </Button>
-        </DialogFooter>
+            <DialogFooter className="p-4 border-t shrink-0">
+              <Button type="button" onClick={handleClose} variant="default">
+                Ok
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

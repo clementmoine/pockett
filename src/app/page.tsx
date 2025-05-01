@@ -3,7 +3,19 @@
 import { useCallback, useMemo, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { createHash } from "crypto";
-import { GalleryVerticalEnd, Import, Plus, Share } from "lucide-react";
+import {
+  GalleryVerticalEnd,
+  Plus,
+  Ellipsis,
+  Download,
+  Upload,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { Button } from "@/components/ui/button";
 import { FormModal } from "@/components/modals/FormModal";
@@ -13,6 +25,7 @@ import { Cards } from "@/components/Cards";
 
 import { useCardStorage } from "@/lib/useCardStorage";
 import { Card } from "@/lib/types";
+import { toast } from "sonner";
 
 const generateNumericId = () => {
   const uuid = uuidv4();
@@ -61,10 +74,11 @@ export default function Home() {
             .then((data) => {
               const { cardUrl } = data;
               window.location.href = cardUrl;
+              toast.success(`${card.name} card pass generated successfully`);
             })
             .catch((error) => {
               console.error("Error generating pass:", error);
-              alert(`Error: ${error.message}`);
+              toast.error("Failed to generate pass");
             });
         }
       });
@@ -78,8 +92,12 @@ export default function Home() {
         for (const card of cards) {
           await addNewCard({ ...card, id: generateNumericId() });
         }
+        toast.success(
+          `${cards?.length ?? 0} card${(cards?.length ?? 0) > 1 ? "s" : ""} imported successfully`,
+        );
       } catch (error) {
         console.error("Error importing cards:", error);
+        toast.error("Failed to import cards");
       }
     },
     [addNewCard],
@@ -118,24 +136,28 @@ export default function Home() {
           <h1 className="text-lg font-semibold text-foreground">Pockett</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setIsModalOpen("export");
-              setExportCards(cards);
-            }}
-          >
-            <Share />
-          </Button>
-
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setIsModalOpen("import");
-            }}
-          >
-            <Import />
-          </Button>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary">
+                <Ellipsis />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => setIsModalOpen("import")}>
+                <Upload />
+                Import cards
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setIsModalOpen("export");
+                  setExportCards(cards);
+                }}
+              >
+                <Download />
+                Share cards
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button
             variant="default"
