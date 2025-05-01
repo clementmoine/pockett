@@ -32,6 +32,7 @@ import { ColorPicker } from "@/components/ColorPicker";
 
 import type { Card as CardType } from "@/lib/types";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const cardSchema = z.object({
   name: z
@@ -139,6 +140,12 @@ export function FormModal({
 
   const handleLogoChange = async (file: File | null) => {
     if (file) {
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please upload a valid image file.");
+        setLogoPreview(null);
+        return;
+      }
+
       try {
         const base64 = await convertFileToBase64(file);
         setLogoPreview(base64);
@@ -169,16 +176,10 @@ export function FormModal({
     if (card && onEditCard) {
       // Editing an existing card
       await onEditCard(updatedCard);
+      toast.success(`${card.name} card updated successfully`);
     } else {
       // Adding a new card
       await onAddCard(updatedCard);
-    }
-
-    // Toast success message
-    if (card) {
-      toast.success(`${card.name} card updated successfully`);
-    }
-    if (!card) {
       toast.success(`${updatedCard.name} card added successfully`);
     }
 
@@ -190,6 +191,8 @@ export function FormModal({
     reset();
     onClose();
   };
+
+  const [isFlipped, setIsFlipped] = useState(false);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -216,26 +219,35 @@ export function FormModal({
                 <Tabs
                   value={form.watch("type")}
                   defaultValue={form.watch("type")}
-                  onValueChange={(value) =>
-                    form.setValue("type", value as "auto" | "qr" | "barcode")
-                  }
+                  onValueChange={(value) => {
+                    form.setValue("type", value as "auto" | "qr" | "barcode");
+                  }}
                 >
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="auto">Auto</TabsTrigger>
-                    <TabsTrigger value="qr">QR Code</TabsTrigger>
-                    <TabsTrigger value="barcode">Barcode</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="auto">
+                  <TabsContent
+                    value="auto"
+                    forceMount
+                    className={cn({
+                      hidden: form.watch("type") !== "auto",
+                    })}
+                  >
                     <Card
-                      id={card?.id || -1}
+                      id={-1}
                       type="auto"
                       name={form.watch("name")}
                       color={form.watch("color")}
                       logo={logoPreview || null}
                       code={form.watch("code")}
+                      flipped={isFlipped}
+                      onFlip={setIsFlipped}
                     />
                   </TabsContent>
-                  <TabsContent value="qr">
+                  <TabsContent
+                    value="qr"
+                    forceMount
+                    className={cn({
+                      hidden: form.watch("type") !== "qr",
+                    })}
+                  >
                     <Card
                       id={-1}
                       type="qr"
@@ -243,9 +255,18 @@ export function FormModal({
                       color={form.watch("color")}
                       logo={logoPreview || null}
                       code={form.watch("code")}
+                      flipped={isFlipped}
+                      onFlip={setIsFlipped}
                     />
                   </TabsContent>
-                  <TabsContent value="barcode">
+
+                  <TabsContent
+                    value="barcode"
+                    forceMount
+                    className={cn({
+                      hidden: form.watch("type") !== "barcode",
+                    })}
+                  >
                     <Card
                       id={-1}
                       type="barcode"
@@ -253,8 +274,15 @@ export function FormModal({
                       color={form.watch("color")}
                       logo={logoPreview || null}
                       code={form.watch("code")}
+                      flipped={isFlipped}
+                      onFlip={setIsFlipped}
                     />
                   </TabsContent>
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="auto">Auto</TabsTrigger>
+                    <TabsTrigger value="qr">QR Code</TabsTrigger>
+                    <TabsTrigger value="barcode">Barcode</TabsTrigger>
+                  </TabsList>
                 </Tabs>
               </div>
 
@@ -285,6 +313,7 @@ export function FormModal({
                     <FormControl>
                       <Input
                         type="file"
+                        accept="image/*"
                         className="bg-background text-foreground"
                         onChange={(e) => {
                           const file = e.target.files?.[0] || null;

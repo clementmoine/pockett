@@ -57,7 +57,9 @@ export interface CardProps extends CardType {
   onEditCard?: () => void;
   onAddToWallet?: (id: CardType["id"]) => void;
   onShareCard?: (id: CardType["id"]) => void;
+  flipped?: boolean;
   initialFlipped?: boolean;
+  onFlip?: (flipped: boolean) => void;
 }
 
 type Action = {
@@ -79,13 +81,30 @@ export function Card({
   code,
   type,
   id,
+  flipped: externalFlipped,
   initialFlipped = false,
   onDeleteCard,
   onEditCard,
   onAddToWallet,
   onShareCard,
+  onFlip,
 }: CardProps) {
   const [isFlipped, setIsFlipped] = useState(initialFlipped);
+
+  useEffect(() => {
+    if (externalFlipped !== undefined) {
+      setIsFlipped(externalFlipped);
+    }
+  }, [externalFlipped]);
+
+  const handleFlip = () => {
+    const newFlippedState = !isFlipped;
+    if (externalFlipped === undefined) {
+      setIsFlipped(newFlippedState);
+    }
+    onFlip?.(newFlippedState); // Ensure onFlip is called with the new state
+  };
+
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false); // Separate state for delete dialog
   const [isFullScreenDialogOpen, setIsFullScreenDialogOpen] = useState(false); // Separate state for full-screen dialog
   const [isDeleting, setIsDeleting] = useState(false);
@@ -217,7 +236,7 @@ export function Card({
             style={{
               aspectRatio: "1.61792 / 1",
             }}
-            onClick={() => setIsFlipped(!isFlipped)} // Toggle flip state on click
+            onClick={handleFlip}
           >
             {/* Card Inner */}
             <div
@@ -311,7 +330,7 @@ export function Card({
                     e.stopPropagation();
                     setIsFullScreenDialogOpen(true);
                   }}
-                  className="flex flex-1 !opacity-100 flex-col bg-background rounded-md !px-[5%] !py-[5%] overflow-hidden w-full h-full gap-[10%]"
+                  className="flex flex-1 !opacity-100 flex-col bg-white hover:!bg-white/90 rounded-md !px-[5%] !py-[5%] overflow-hidden w-full h-full gap-[10%]"
                 >
                   <div className="flex flex-1 overflow-hidden h-full w-full justify-center items-center">
                     {codeDataUrl != null && (
@@ -337,7 +356,7 @@ export function Card({
                   </div>
 
                   {!((type == "auto" && code.length > 26) || type == "qr") && (
-                    <p className="text-sm leading-none text-foreground font-mono text-center w-full shrink-0 truncate">
+                    <p className="text-sm leading-none text-black font-mono text-center w-full shrink-0 truncate">
                       {code.trim().length > 1 ? code : "N/A"}
                     </p>
                   )}
