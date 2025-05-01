@@ -42,7 +42,6 @@ export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
-  eaDir: string; // Prevent error on build (no idea what this is)
 }) {
   return (
     // Suppress hydration warning for the html tag due to the theme provider

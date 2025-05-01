@@ -1,10 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
-import { Share, WalletCards } from "lucide-react";
+import {
+  Share,
+  WalletCards,
+  Fullscreen,
+  PenSquare,
+  Trash2,
+  Ellipsis,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import color from "color";
 
@@ -12,9 +19,10 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
-  ContextMenuSeparator,
   ContextMenuTrigger,
+  ContextMenuSeparator,
 } from "@/components/ui/context-menu";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -25,17 +33,44 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import type { Card as CardType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 export interface CardProps extends CardType {
   onDeleteCard?: (id: CardType["id"]) => Promise<void>;
   onEditCard?: () => void;
   onAddToWallet?: (id: CardType["id"]) => void;
   onShareCard?: (id: CardType["id"]) => void;
+  initialFlipped?: boolean;
 }
+
+type Action = {
+  type: "action";
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+};
+
+type Separator = { type: "separator" };
+
+type ActionItem = Action | Separator;
 
 export function Card({
   name,
@@ -44,19 +79,65 @@ export function Card({
   code,
   type,
   id,
+  initialFlipped = false,
   onDeleteCard,
   onEditCard,
   onAddToWallet,
   onShareCard,
 }: CardProps) {
-  const [isFlipped, setIsFlipped] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(initialFlipped);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false); // Separate state for delete dialog
+  const [isFullScreenDialogOpen, setIsFullScreenDialogOpen] = useState(false); // Separate state for full-screen dialog
   const [isDeleting, setIsDeleting] = useState(false);
   const [codeDataUrl, setCodeDataUrl] = useState<string | null>(null);
 
-  const hasActions = onEditCard || onDeleteCard || onAddToWallet || onShareCard;
-
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  const actions: ActionItem[] | undefined = useMemo(() => {
+    if (!id || id == -1) return undefined;
+
+    const actionItems = [
+      {
+        type: "action",
+        label: "Open",
+        icon: <Fullscreen className="mr-2 h-4 w-4" />,
+        onClick: () => setIsFullScreenDialogOpen(true),
+        disabled: false,
+      },
+      { type: "separator" },
+      onEditCard && {
+        type: "action",
+        label: "Edit",
+        icon: <PenSquare className="mr-2 h-4 w-4" />,
+        onClick: onEditCard,
+        disabled: false,
+      },
+      onDeleteCard && {
+        type: "action",
+        label: "Delete",
+        icon: <Trash2 className="mr-2 h-4 w-4" />,
+        onClick: () => setIsDeleteDialogOpen(true),
+        disabled: false,
+      },
+      { type: "separator" },
+      onAddToWallet && {
+        type: "action",
+        label: "Add to Wallet",
+        icon: <WalletCards className="mr-2 h-4 w-4" />,
+        onClick: () => onAddToWallet(id),
+        disabled: isOffline,
+      },
+      onShareCard && {
+        type: "action",
+        label: "Share",
+        icon: <Share className="mr-2 h-4 w-4" />,
+        onClick: () => onShareCard(id),
+        disabled: isOffline,
+      },
+    ].filter(Boolean) as ActionItem[];
+
+    return actionItems;
+  }, [onEditCard, onDeleteCard, onAddToWallet, onShareCard, id, isOffline]);
 
   useEffect(() => {
     const updateOnlineStatus = () => setIsOffline(!navigator.onLine);
@@ -91,7 +172,7 @@ export function Card({
         // Use QR code for larger data
         const qrCodeUrl = await QRCode.toDataURL(parsedCode, {
           width: 128,
-          margin: 1,
+          margin: 0,
         });
         setCodeDataUrl(qrCodeUrl);
       } else {
@@ -100,7 +181,8 @@ export function Card({
         JsBarcode(canvas, parsedCode, {
           lineColor: "#000",
           width: 2,
-          height: 100,
+          height: 1,
+          margin: 0,
           displayValue: false,
         });
         setCodeDataUrl(canvas.toDataURL("image/png"));
@@ -116,7 +198,7 @@ export function Card({
     setIsDeleting(true);
     try {
       await onDeleteCard(id);
-      setIsDialogOpen(false);
+      setIsDeleteDialogOpen(false);
       toast.success(`${name} card deleted successfully`);
     } catch (error) {
       console.error("Failed to delete card:", error);
@@ -129,9 +211,9 @@ export function Card({
   return (
     <>
       <ContextMenu>
-        <ContextMenuTrigger disabled={!hasActions}>
+        <ContextMenuTrigger disabled={!actions}>
           <motion.div
-            className="relative w-full cursor-pointer select-none"
+            className="relative w-full select-none"
             style={{
               aspectRatio: "1.61792 / 1",
             }}
@@ -147,7 +229,7 @@ export function Card({
             >
               {/* Front Side */}
               <div
-                className="absolute inset-0 flex flex-col gap-2 items-center justify-center rounded-xl shadow-lg backface-hidden"
+                className="absolute inset-0 flex flex-col gap-2 items-center justify-center overflow-hidden rounded-xl shadow-lg backface-hidden"
                 style={{
                   backgroundColor: cardColor || "#FFF",
                 }}
@@ -166,103 +248,156 @@ export function Card({
                     No Logo
                   </span>
                 )}
-                <span className={`text-sm text-center w-full ${textColor}`}>
+                <span
+                  className={`text-sm text-center w-full ${textColor} line-clamp-2 px-2`}
+                >
                   {name.trim().length > 1 ? name : "N/A"}
                 </span>
               </div>
 
               {/* Back Side */}
               <div
-                className="absolute inset-0 flex flex-col gap-2 p-2 items-center rounded-xl shadow-lg backface-hidden transform rotate-y-180"
+                className="absolute inset-0 flex flex-col gap-2 p-2 items-center rounded-xl shadow-lg backface-hidden transform rotate-y-180 overflow-hidden"
                 style={{
                   backgroundColor: cardColor || "#FFF",
                 }}
               >
-                {logo ? (
-                  <Image
-                    src={logo}
-                    width={128}
-                    height={128}
-                    alt="Card Logo"
-                    className="h-2 w-auto shrink-0 object-contain select-none"
-                    draggable={false}
-                  />
-                ) : (
-                  <span className={`text-sm font-bold ${textColor}`}>
-                    No Logo
-                  </span>
+                <p
+                  className={`text-sm text-center w-full whitespace-nowrap text-ellipsis overflow-hidden px-8 ${textColor}`}
+                >
+                  {name.trim().length > 1 ? name : "N/A"}
+                </p>
+
+                {actions && (
+                  <DropdownMenu modal={false}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="secondary"
+                        className="absolute top-1 right-1 !p-0 !size-7 rounded-xl shadow"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                      >
+                        <Ellipsis />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      {actions?.map((action, index) =>
+                        action.type === "separator" ? (
+                          <DropdownMenuSeparator key={`separator-${index}`} />
+                        ) : (
+                          <DropdownMenuItem
+                            key={index}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              action.onClick();
+                            }}
+                            disabled={action.disabled}
+                          >
+                            {action.icon}
+                            {action.label}
+                          </DropdownMenuItem>
+                        ),
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
 
                 {/* Code (Barcode or QR Code) */}
-                <div className="flex flex-col bg-background rounded-md p-2 overflow-hidden w-full h-full gap-2">
-                  {codeDataUrl != null ? (
-                    <Image
-                      width={128}
-                      height={64}
-                      src={codeDataUrl}
-                      alt="Code"
-                      className={cn(
-                        "w-full h-full overflow-hidden  select-none",
-                        {
-                          "object-contain": type == "qr",
-                        },
-                      )}
-                      draggable={false}
-                    />
-                  ) : (
-                    <div className="h-16 w-full" />
-                  )}
+                <Button
+                  disabled={!actions}
+                  variant="ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsFullScreenDialogOpen(true);
+                  }}
+                  className="flex flex-1 !opacity-100 flex-col bg-background rounded-md !px-[5%] !py-[5%] overflow-hidden w-full h-full gap-[10%]"
+                >
+                  <div className="flex flex-1 overflow-hidden h-full w-full justify-center items-center">
+                    {codeDataUrl != null && (
+                      <Image
+                        width={128}
+                        height={64}
+                        src={codeDataUrl}
+                        alt="Code"
+                        className={cn(
+                          "w-full h-full overflow-hidden select-none",
+                          {
+                            "object-contain":
+                              (type == "auto" && code.length > 26) ||
+                              type == "qr",
+                          },
+                        )}
+                        style={{
+                          imageRendering: "pixelated",
+                        }}
+                        draggable={false}
+                      />
+                    )}
+                  </div>
 
-                  {type !== "qr" && (
-                    <span className="text-sm text-foreground font-mono text-center w-full shrink-0 truncate">
+                  {!((type == "auto" && code.length > 26) || type == "qr") && (
+                    <p className="text-sm leading-none text-foreground font-mono text-center w-full shrink-0 truncate">
                       {code.trim().length > 1 ? code : "N/A"}
-                    </span>
+                    </p>
                   )}
-                </div>
+                </Button>
               </div>
             </div>
           </motion.div>
         </ContextMenuTrigger>
 
-        {hasActions && (
+        {actions && (
           <ContextMenuContent className="rounded-md shadow-md p-2">
-            {onEditCard && (
-              <ContextMenuItem onClick={onEditCard}>Edit</ContextMenuItem>
-            )}
-            {onDeleteCard && (
-              <ContextMenuItem onClick={() => setIsDialogOpen(true)}>
-                Delete
-              </ContextMenuItem>
-            )}
-
-            {(onEditCard || onDeleteCard) && (onAddToWallet || onShareCard) && (
-              <ContextMenuSeparator />
-            )}
-
-            {onAddToWallet && (
-              <ContextMenuItem
-                disabled={isOffline}
-                onClick={() => onAddToWallet(id)}
-              >
-                <WalletCards />
-                Add to Wallet
-              </ContextMenuItem>
-            )}
-            {onShareCard && (
-              <ContextMenuItem
-                disabled={isOffline}
-                onClick={() => onShareCard(id)}
-              >
-                <Share />
-                Share
-              </ContextMenuItem>
+            {actions.map((action, index) =>
+              action.type === "separator" ? (
+                <ContextMenuSeparator key={`separator-${index}`} />
+              ) : (
+                <ContextMenuItem
+                  key={index}
+                  onClick={action.onClick}
+                  disabled={action.disabled}
+                >
+                  {action.icon}
+                  {action.label}
+                </ContextMenuItem>
+              ),
             )}
           </ContextMenuContent>
         )}
       </ContextMenu>
 
+      {/* Full-Screen Dialog */}
+      <Dialog
+        open={isFullScreenDialogOpen}
+        onOpenChange={setIsFullScreenDialogOpen}
+      >
+        <DialogContent
+          showClose={false}
+          className="p-0 rounded-xl bg-transparent border-none shadow-none outline-none"
+        >
+          <VisuallyHidden>
+            <DialogHeader>
+              <DialogTitle>{name}</DialogTitle>
+            </DialogHeader>
+          </VisuallyHidden>
+          <Card
+            id={-1}
+            name={name}
+            logo={logo}
+            color={cardColor}
+            code={code}
+            type={type}
+            initialFlipped={true}
+          />
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
