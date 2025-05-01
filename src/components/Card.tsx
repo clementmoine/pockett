@@ -39,18 +39,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-import type { Card as CardType } from "@/lib/types";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
+
+import type { Card as CardType } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export interface CardProps extends CardType {
   onDeleteCard?: (id: CardType["id"]) => Promise<void>;
@@ -291,6 +291,7 @@ export function Card({
                   <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
                       <Button
+                        type="button"
                         variant="secondary"
                         className="absolute top-1 right-1 !p-0 !size-7 rounded-xl shadow"
                         onClick={(e) => {
