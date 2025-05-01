@@ -99,6 +99,7 @@ export default function Home() {
   );
 
   const handleModalClose = useCallback(() => {
+    setEditingCard(undefined);
     setIsModalOpen(undefined);
     setExportCards(undefined);
   }, []);
