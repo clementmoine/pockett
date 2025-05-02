@@ -1,6 +1,9 @@
 "use client";
 
 import { z } from "zod";
+import { toast } from "sonner";
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -22,6 +25,9 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
+
+import Klarna from "@/images/klarna.svg";
+import Image from "next/image";
 
 import type { Card } from "@/types/card";
 
@@ -54,7 +60,7 @@ export function ImportModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (cards: Card[]) => Promise<void>;
+  onImport: (cards: Card[], ignoreExisting?: boolean) => Promise<void>;
 }) {
   const form = useForm<FormValues>({
     resolver: zodResolver(importSchema),
@@ -65,10 +71,12 @@ export function ImportModal({
 
   const { reset } = form;
 
+  const [loading, setLoading] = useState(false); // Manage loading state
+
   const handleSubmit = async (values: FormValues) => {
     const cards = JSON.parse(values.json);
     if (!Array.isArray(cards)) {
-      alert("Invalid JSON format. Please provide an array of cards.");
+      toast.error("Invalid JSON format. Please provide an array of cards.");
       return;
     }
 
@@ -79,6 +87,31 @@ export function ImportModal({
   const handleClose = () => {
     reset();
     onClose();
+  };
+
+  const importFromKlarna = async () => {
+    try {
+      setLoading(true);
+
+      const response = await fetch("/api/klarna/cards");
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch cards from Klarna");
+      }
+
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        onImport(data, true);
+        handleClose();
+      } else {
+        toast.error("Invalid data format from Klarna");
+      }
+    } catch (error) {
+      console.log("Error importing data from Klarna", error);
+      toast.error("Error importing data from Klarna");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -117,6 +150,21 @@ export function ImportModal({
             </div>
 
             <DialogFooter className="p-4 border-t shrink-0">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={importFromKlarna}
+                style={{
+                  backgroundColor: "#ffa8cd",
+                  color: "#0E0E0F",
+                }}
+                className="sm:mr-auto"
+                disabled={loading}
+              >
+                {loading && <Loader2 className=" animate-spin" />}
+                Import from
+                <Image src={Klarna} alt="Klarna" className="h-3 w-fit" />
+              </Button>
               <Button type="button" onClick={handleClose} variant="secondary">
                 Cancel
               </Button>

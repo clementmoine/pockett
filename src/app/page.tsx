@@ -88,10 +88,13 @@ export default function Home() {
   );
 
   const handleImport = useCallback(
-    async (cards: Card[]) => {
+    async (cards: Card[], ignoreExisting?: boolean) => {
       try {
         for (const card of cards) {
-          await addNewCard({ ...card, id: generateNumericId() });
+          await addNewCard(
+            { ...card, id: generateNumericId() },
+            ignoreExisting,
+          );
         }
         toast.success(
           `${cards?.length ?? 0} card${(cards?.length ?? 0) > 1 ? "s" : ""} imported successfully`,

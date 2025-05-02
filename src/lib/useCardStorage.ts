@@ -17,9 +17,16 @@ export function useCardStorage() {
 
   // Add a new card
   const addNewCard = useCallback(
-    async (card: Card) => {
+    async (card: Card, ignoreExisting: boolean = false) => {
       const storedCards =
         (await localforage.getItem<Card[]>(CARD_STORAGE_KEY)) || [];
+
+      const alreadyExists = storedCards.some((c) => {
+        console.log(c);
+        return c.code === card.code;
+      });
+      if (alreadyExists && ignoreExisting) return;
+
       await localforage.setItem(CARD_STORAGE_KEY, [...storedCards, card]);
       await fetchCards(); // Refresh cards after adding
     },
