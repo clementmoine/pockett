@@ -4,6 +4,7 @@
   "description": "All your loyalty cards, always in your pocket.",
   "start_url": "/",
   "display": "standalone",
+  "categories": ["utilities", "productivity", "shopping"],
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
   "orientation": "portrait",
