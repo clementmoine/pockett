@@ -1,9 +1,9 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import color from "color";
 import sharp from "sharp";
 import { dataUriToBuffer } from "data-uri-to-buffer";
+import type { NextApiRequest, NextApiResponse } from "next";
 
-import { Card } from "@/lib/types";
+import type { Card } from "@/types/card";
 
 export const config = {
   api: {

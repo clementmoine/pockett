@@ -2,8 +2,9 @@
 
 import { useRef, useState } from "react";
 
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+
 import { cn } from "@/lib/utils";
 
 export function ColorPicker({
@@ -33,10 +34,10 @@ export function ColorPicker({
         type="button"
         variant="ghost"
         onClick={openColorPicker}
-        className="absolute left-0 size-8 p-0 rounded transition-all"
+        className="absolute left-1 size-8 p-0 rounded transition-all"
       >
         <div
-          className="size-4 rounded"
+          className="size-4 rounded border"
           style={{ backgroundColor: (value || internalValue) as string }}
         />
       </Button>
@@ -52,7 +53,7 @@ export function ColorPicker({
 
       <Input
         type="text"
-        className="!px-8"
+        className="!px-9"
         value={value || internalValue}
         onChange={(e) => {
           const newValue = e.target.value;

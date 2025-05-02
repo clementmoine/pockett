@@ -23,7 +23,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 
-import type { Card } from "@/lib/types";
+import type { Card } from "@/types/card";
 
 const importSchema = z.object({
   json: z

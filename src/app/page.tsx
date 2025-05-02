@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import { createHash } from "crypto";
+import { useCallback, useMemo, useState } from "react";
 import {
   GalleryVerticalEnd,
   Plus,
@@ -10,13 +11,13 @@ import {
   Download,
   Upload,
 } from "lucide-react";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
 import { Button } from "@/components/ui/button";
 import { FormModal } from "@/components/modals/FormModal";
 import { ExportModal } from "@/components/modals/ExportModal";
@@ -24,8 +25,8 @@ import { ImportModal } from "@/components/modals/ImportModal";
 import { Cards } from "@/components/Cards";
 
 import { useCardStorage } from "@/lib/useCardStorage";
-import { Card } from "@/lib/types";
-import { toast } from "sonner";
+
+import type { Card } from "@/types/card";
 
 const generateNumericId = () => {
   const uuid = uuidv4();
@@ -53,7 +54,7 @@ export default function Home() {
     (id: Card["id"]) => {
       getCard(id).then((card) => {
         if (card) {
-          fetch("/api/generate", {
+          fetch("/api/pass/generate", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

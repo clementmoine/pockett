@@ -3,6 +3,7 @@
 import Image from "next/image";
 import React, { useState, useEffect, useMemo } from "react";
 import JsBarcode from "jsbarcode";
+import { toast } from "sonner";
 import QRCode from "qrcode";
 import {
   Share,
@@ -48,9 +49,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import type { Card as CardType } from "@/lib/types";
+import type { Card as CardType } from "@/types/card";
+
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
 export interface CardProps extends CardType {
   onDeleteCard?: (id: CardType["id"]) => Promise<void>;

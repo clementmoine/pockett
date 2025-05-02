@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
-import { ClipboardCopy } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { ClipboardCopy } from "lucide-react";
+import { zodResolver } from "@hookform/resolvers/zod";
+
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -14,7 +17,6 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import type { Card as CardType } from "@/lib/types";
 import {
   FormField,
   FormItem,
@@ -22,9 +24,9 @@ import {
   FormControl,
   FormMessage,
   Form,
-} from "@/components/ui/form"; // Adjust the path based on your project structure
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+} from "@/components/ui/form";
+
+import type { Card as CardType } from "@/types/card";
 
 const importSchema = z.object({
   json: z

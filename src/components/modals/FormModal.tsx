@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { createHash } from "crypto";
+import { toast } from "sonner";
 import color from "color";
 
 import { Button } from "@/components/ui/button";
@@ -29,12 +30,18 @@ import {
 import { Card } from "@/components/Card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ColorPicker } from "@/components/ColorPicker";
+import { CountryPicker } from "@/components/CountryPicker";
+import { ProviderPicker } from "@/components/ProviderPicker";
 
-import type { Card as CardType } from "@/lib/types";
-import { toast } from "sonner";
+import type { Card as CardType } from "@/types/card";
+import type { Provider as ProviderType } from "@/types/provider";
+import { COUNTRIES } from "@/types/country";
+
 import { cn } from "@/lib/utils";
 
 const cardSchema = z.object({
+  country: z.enum(COUNTRIES).optional(),
+  provider: z.string().trim().optional(),
   name: z
     .string()
     .trim()
@@ -86,6 +93,29 @@ const convertFileToBase64 = async (file: File): Promise<string> => {
   });
 };
 
+const fetchLogoFromUrl = async (url: string): Promise<string | null> => {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return await convertFileToBase64(
+      new File([blob], "logo.png", { type: blob.type }),
+    );
+  } catch (error) {
+    console.error("Error fetching logo from URL:", error);
+    return null;
+  }
+};
+
+const defaultValues: FormValues = {
+  provider: "",
+  name: "",
+  code: "",
+  logo: null,
+  color: "",
+  country: "FR",
+  type: "auto",
+};
+
 export function FormModal({
   isOpen,
   onClose,
@@ -105,13 +135,7 @@ export function FormModal({
 
   const form = useForm({
     resolver: zodResolver(cardSchema),
-    defaultValues: {
-      name: "",
-      code: "",
-      logo: null,
-      color: "",
-      type: "auto",
-    },
+    defaultValues,
   });
 
   const { reset } = form;
@@ -119,39 +143,60 @@ export function FormModal({
   useEffect(() => {
     if (card) {
       reset({
-        name: card.name || "",
-        code: card.code || "",
-        logo: card.logo || null,
-        color: card.color || "",
-        type: card.type || "",
+        country: card.country || defaultValues.country,
+        provider: card.provider || defaultValues.provider,
+        name: card.name || defaultValues.name,
+        code: card.code || defaultValues.code,
+        logo: card.logo || defaultValues.logo,
+        color: card.color || defaultValues.color,
+        type: card.type || defaultValues.type,
       });
       setLogoPreview(card.logo || null);
     } else {
-      reset({
-        name: "",
-        code: "",
-        logo: null,
-        color: "",
-        type: "auto",
-      });
+      reset(defaultValues);
       setLogoPreview(null);
     }
   }, [card, reset]);
 
-  const handleLogoChange = async (file: File | null) => {
-    if (file) {
-      if (!file.type.startsWith("image/")) {
-        toast.error("Please upload a valid image file.");
-        setLogoPreview(null);
-        return;
-      }
+  const handleProviderChange = async (provider: ProviderType) => {
+    if (provider.visual.logo_url) {
+      const base64 = await fetchLogoFromUrl(provider.visual.logo_url);
+      form.setValue("logo", base64);
+      setLogoPreview(base64);
+    }
 
-      try {
-        const base64 = await convertFileToBase64(file);
-        setLogoPreview(base64);
-      } catch (error) {
-        console.error("Error converting file to base64:", error);
-        setLogoPreview(null);
+    if (
+      !form.getFieldState("name").isTouched ||
+      form.watch("name").length < 1
+    ) {
+      form.setValue("name", provider.provider_name);
+    }
+
+    form.setValue("color", provider.visual.color);
+    form.setValue(
+      "type",
+      provider.default_barcode_format === "QR_CODE" ? "qr" : "barcode",
+    );
+  };
+
+  const handleLogoChange = async (file: File | string | null) => {
+    if (file != null) {
+      if (file instanceof File) {
+        if (!file.type.startsWith("image/")) {
+          toast.error("Please upload a valid image file.");
+          setLogoPreview(null);
+          return;
+        }
+
+        try {
+          const base64 = await convertFileToBase64(file);
+          setLogoPreview(base64);
+        } catch (error) {
+          console.error("Error converting file to base64:", error);
+          setLogoPreview(null);
+        }
+      } else {
+        setLogoPreview(file);
       }
     } else {
       setLogoPreview(null);
@@ -165,12 +210,14 @@ export function FormModal({
     }
 
     const updatedCard: CardType = {
+      provider: values.provider,
       type: values.type,
       id: card ? card.id : generateNumericId(),
       name: values.name,
       code: values.code,
       logo: logo,
       color: values.color,
+      country: values.country,
     };
 
     if (card && onEditCard) {
@@ -190,6 +237,7 @@ export function FormModal({
     setLogoPreview(null);
     reset();
     onClose();
+    setIsFlipped(false);
   };
 
   const [isFlipped, setIsFlipped] = useState(false);
@@ -284,6 +332,48 @@ export function FormModal({
                     <TabsTrigger value="barcode">Barcode</TabsTrigger>
                   </TabsList>
                 </Tabs>
+              </div>
+
+              <div className="flex gap-2">
+                <FormField
+                  control={form.control}
+                  name="country"
+                  render={({ field }) => (
+                    <FormItem className="w-1/3">
+                      <FormLabel className="text-foreground">Country</FormLabel>
+                      <FormControl>
+                        <CountryPicker {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="provider"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel className="text-foreground">
+                        Provider
+                      </FormLabel>
+                      <FormControl>
+                        <ProviderPicker
+                          countryCode={form.watch("country")}
+                          suggestFrom={form.watch("name")}
+                          {...field}
+                          onChange={(
+                            id: ProviderType["provider_id"],
+                            provider: ProviderType,
+                          ) => {
+                            field.onChange(id);
+                            handleProviderChange(provider);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               <FormField
