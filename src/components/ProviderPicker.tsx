@@ -41,7 +41,7 @@ export function ProviderPicker({
   const [providers, setProviders] = useState<Provider[]>([]);
 
   const suggestedProviders = useMemo<Provider[]>(() => {
-    if (!suggestFrom) return [];
+    if (!suggestFrom || value) return [];
 
     const normalizedSuggest = suggestFrom
       .trim()
@@ -51,7 +51,6 @@ export function ProviderPicker({
       .replace(/[\u0300-\u036f]/g, "");
 
     return providers
-      .filter((provider) => provider.provider_id != value)
       .map((provider) => {
         const normalizedName = provider.provider_name
           .trim()
@@ -73,16 +72,29 @@ export function ProviderPicker({
           normalizedName.startsWith(normalizedSuggest) ||
           normalizedTerms.some((term) => term.startsWith(normalizedSuggest));
 
+        const includes =
+          !startsWith &&
+          (normalizedName.includes(normalizedSuggest) ||
+            normalizedTerms.some((term) => term.includes(normalizedSuggest)));
+
         const distance = Math.min(
           leven(normalizedName, normalizedSuggest),
           ...normalizedTerms.map((term) => leven(term, normalizedSuggest)),
         );
 
-        return { ...provider, _distance: distance, _startsWith: startsWith };
+        return {
+          ...provider,
+          _distance: distance,
+          _startsWith: startsWith,
+          _includes: includes,
+        };
       })
       .sort((a, b) => {
         if (a._startsWith && !b._startsWith) return -1;
         if (!a._startsWith && b._startsWith) return 1;
+
+        if (a._includes && !b._includes) return -1;
+        if (!a._includes && b._includes) return 1;
 
         return a._distance - b._distance;
       })
