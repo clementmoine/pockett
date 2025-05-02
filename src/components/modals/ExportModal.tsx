@@ -71,19 +71,38 @@ export function ExportModal({
     onClose();
   };
 
-  const handleCopyToClipboard = () => {
+  const copyToClipboard = async (textToCopy: string) => {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(textToCopy);
+    } else {
+      const textArea = document.createElement("textarea");
+      textArea.value = textToCopy;
+      textArea.style.position = "absolute";
+      textArea.style.left = "-999999px";
+      document.body.prepend(textArea);
+      textArea.select();
+
+      try {
+        document.execCommand("copy");
+      } catch (error) {
+        console.error("Failed to copy text: ", error);
+      } finally {
+        textArea.remove();
+      }
+    }
+  };
+
+  const handleCopyToClipboard = async () => {
     const json = getValues("json");
-    navigator.clipboard.writeText(json).then(
-      () => {
-        toast.success(
-          `${cards?.length ?? 0} card${(cards?.length ?? 0) > 1 ? "s" : ""} copied to clipboard`,
-        );
-      },
-      (err) => {
-        console.error("Could not copy text: ", err);
-        toast.error("Failed to copy to clipboard");
-      },
-    );
+    try {
+      await copyToClipboard(json);
+      toast.success(
+        `${cards?.length ?? 0} card${(cards?.length ?? 0) > 1 ? "s" : ""} copied to clipboard`,
+      );
+    } catch (err) {
+      console.error("Could not copy text: ", err);
+      toast.error("Failed to copy to clipboard");
+    }
   };
 
   useEffect(() => {
