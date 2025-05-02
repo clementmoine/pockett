@@ -145,8 +145,8 @@ export default async function handler(
       console.error("Error creating card:", response);
       throw new Error(`Failed to create card: ${response.statusText}`);
     }
-
-    const { cardId } = (await response.json()) as { cardId: string };
+    const responseData = (await response.json()) as { cardId: string };
+    const { cardId } = responseData;
 
     const previewRes = await fetch(`${baseUrl}api/preview/${cardId}`, {
       headers: {
@@ -159,7 +159,7 @@ export default async function handler(
     }
 
     const previewData = await previewRes.json();
-    const { applePassUrl, googlePassUrl } = previewData.data as {
+    const { applePassUrl, googlePassUrl } = previewData.data.data as {
       applePassUrl: string;
       googlePassUrl: string;
     };
