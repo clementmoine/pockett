@@ -146,7 +146,7 @@ export default function Home() {
                 <Ellipsis />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
+            <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setIsModalOpen("import")}>
                 <Upload />
                 Import cards

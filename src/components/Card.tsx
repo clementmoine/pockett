@@ -302,7 +302,7 @@ export function Card({
                         <Ellipsis />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent>
+                    <DropdownMenuContent align="start">
                       {actions?.map((action, index) =>
                         action.type === "separator" ? (
                           <DropdownMenuSeparator key={`separator-${index}`} />
