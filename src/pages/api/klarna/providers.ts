@@ -1,10 +1,12 @@
 import path from "path";
 import fs from "fs/promises";
 import { NextApiRequest, NextApiResponse } from "next";
-import { getAccessToken, retry } from "@/pages/api/klarna";
 
-import type { Provider } from "@/types/provider";
+import { retry } from "@/lib/retry";
+import { klarnaSession } from "@/lib/session";
+
 import type { Country } from "@/types/country";
+import type { Provider } from "@/types/provider";
 
 const CACHE_TTL = 1000 * 60 * 60 * 24 * 30; // 30 days
 const BASE_DIR = path.join(process.cwd(), ".next", "cache", "data", "klarna");
@@ -22,7 +24,6 @@ interface CacheMetadata {
   providers: ProviderMetadata[];
 }
 
-// Helpers pour lire/écrire la métadonnée globale
 async function readMetadata(): Promise<CacheMetadata | null> {
   try {
     const content = await fs.readFile(METADATA_FILE, "utf-8");
@@ -41,23 +42,23 @@ async function writeMetadata(metadata: CacheMetadata): Promise<void> {
   }
 }
 
-// Gestion d'un fournisseur individuel
+// Get the JSON path to the provider in cache
 async function getProviderFilePath(providerId: string): Promise<string> {
   await fs.mkdir(PROVIDERS_DIR, { recursive: true });
   return path.join(PROVIDERS_DIR, `${providerId}.json`);
 }
 
 async function saveProviderData(provider: Provider): Promise<Provider> {
-  // Télécharger et convertir le logo en base64 si présent
+  // Download and convert logo
   if (provider.visual.logo_url) {
     const originalLogoUrl = provider.visual.logo_url;
 
     try {
       const response = await retry(() => fetch(originalLogoUrl));
+
       if (response.ok) {
         const buffer = Buffer.from(await response.arrayBuffer());
 
-        // Détecter le type MIME de l'image (simplifié)
         let mimeType = "image/png";
         if (
           originalLogoUrl.toLowerCase().endsWith(".jpg") ||
@@ -68,11 +69,10 @@ async function saveProviderData(provider: Provider): Promise<Provider> {
           mimeType = "image/svg+xml";
         }
 
-        // Convertir en base64 et créer l'URL data
         const base64Data = buffer.toString("base64");
         const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
-        // Remplacer l'URL du logo par la chaîne base64
+        // Save the logo url as base64
         provider.visual.logo_url = dataUrl;
       }
     } catch (err) {
@@ -83,7 +83,7 @@ async function saveProviderData(provider: Provider): Promise<Provider> {
     }
   }
 
-  // Sauvegarder les données du fournisseur avec le logo en base64
+  // Save the providers data with logo in base64
   const filePath = await getProviderFilePath(provider.provider_id);
   await fs.writeFile(filePath, JSON.stringify(provider), "utf-8");
 
@@ -102,41 +102,24 @@ async function readProviderData(providerId: string): Promise<Provider | null> {
 
 // Fetch, process and save providers
 async function fetchAndSaveProviders(): Promise<Provider[]> {
-  // Get providers from Klarna API
-  const accessToken = await retry(() => getAccessToken());
-  if (!accessToken) throw new Error("Failed to get access token");
-
-  const response = await retry(() =>
-    fetch(
-      "https://app.klarna.com/fr/api/consumer_wallet_bff/v1/all-providers",
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      },
-    ),
+  const data = await klarnaSession.request<{ providers: Provider[] }>(
+    "/fr/api/consumer_wallet_bff/v1/all-providers",
   );
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch providers (${response.statusText})`);
-  }
-
-  const data = await response.json();
   if (!data?.providers || !Array.isArray(data.providers)) {
     throw new Error("Invalid response format from Klarna API");
   }
 
   const providers = data.providers as Provider[];
 
-  // Traiter et sauvegarder chaque fournisseur en parallèle
+  // Process each provider in parallel
   const processedProviders = await Promise.all(
     providers.map(async (provider) => {
       return await saveProviderData(provider);
     }),
   );
 
-  // Mettre à jour les métadonnées
+  // Update metadata
   const metadata: CacheMetadata = {
     lastFetched: Date.now(),
     providers: processedProviders.map((p) => ({
@@ -150,26 +133,20 @@ async function fetchAndSaveProviders(): Promise<Provider[]> {
   return processedProviders;
 }
 
-// Charger les fournisseurs depuis le cache
-async function loadProviders(
-  metadata: CacheMetadata,
-  country?: Country,
-): Promise<Provider[]> {
-  // Filtrer les métadonnées si un pays est spécifié
+// Load providers from cache
+async function loadProviders(metadata: CacheMetadata): Promise<Provider[]> {
+  // Load providers ids
   const providerIds = metadata.providers.map((p) => p.providerId);
 
-  // Charger tous les fournisseurs en parallèle
+  // Load each provider in parallel
   const providers = await Promise.all(
     providerIds.map(async (id) => {
       return await readProviderData(id);
     }),
   );
 
-  // Filtrer les nulls et appliquer le filtre par pays si nécessaire
-  const validProviders = providers.filter(
-    (p): p is Provider =>
-      p !== null && (!country || p.markets.includes(country)),
-  );
+  // Filter invalid
+  const validProviders = providers.filter((p): p is Provider => p !== null);
 
   return validProviders;
 }
@@ -183,27 +160,28 @@ export default async function handlers(
   }
 
   try {
-    // Lire les métadonnées
     const metadata = await readMetadata();
+    const ignoreCache = req.query?.ignoreCache === "true";
     const isExpired =
-      !metadata || Date.now() - metadata.lastFetched >= CACHE_TTL;
+      !metadata ||
+      ignoreCache ||
+      Date.now() - metadata.lastFetched >= CACHE_TTL;
 
     let providers: Provider[];
+    const country = req.query.country as Country | undefined;
+    if (!country) {
+      return res.status(400).json({ error: "Missing 'country' query param" });
+    }
 
-    // Récupérer de nouvelles données si le cache est expiré
+    // Expired cache data
     if (isExpired) {
       providers = await fetchAndSaveProviders();
     } else {
-      // Sinon, charger depuis le cache
-      const country = req.query.country as Country | undefined;
-      providers = await loadProviders(metadata, country);
+      // Load from cache
+      providers = await loadProviders(metadata);
     }
 
-    // Appliquer le filtre par pays si ce n'est pas déjà fait
-    if (req.query.country && !isExpired) {
-      const country = req.query.country as Country;
-      providers = providers.filter((p) => p.markets.includes(country));
-    }
+    providers = providers.filter((p) => p.markets.includes(country));
 
     return res.status(200).json(providers);
   } catch (error) {

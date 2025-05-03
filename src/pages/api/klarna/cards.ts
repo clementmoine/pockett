@@ -1,8 +1,11 @@
 import { NextApiRequest, NextApiResponse } from "next";
 
-import { getAccessToken, retry, toBase64 } from "@/pages/api/klarna";
-
 import type { Card } from "@/types/card";
+import { Provider } from "@/types/provider";
+
+import { retry } from "@/lib/retry";
+import { toBase64 } from "@/lib/toBase64";
+import { klarnaSession } from "@/lib/session";
 
 let cachedResponse: Card[] | null = null;
 let cachedAt: number | null = null;
@@ -17,46 +20,39 @@ export default async function cards(req: NextApiRequest, res: NextApiResponse) {
       return res.status(200).json(cachedResponse);
     }
 
-    const accessToken = await retry(() => getAccessToken());
-
-    if (!accessToken) {
-      throw new Error("Access token is missing");
-    }
-
-    const response = await retry(() =>
-      fetch(
-        "https://app.klarna.com/fr/api/consumer_wallet_bff/v1/loyalty-content",
+    const data = await klarnaSession.request<{
+      loyalty_identifiers: [
         {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+          is_custom_card: boolean;
+          processed: {
+            provider_id: Provider["provider_id"];
+            name: Provider["provider_name"];
+            label: string;
+            visual: Provider["visual"];
+            barcode: {
+              format: Provider["default_barcode_format"];
+              content: string | number;
+            };
+          };
         },
-      ),
-    );
+      ];
+    }>("/fr/api/consumer_wallet_bff/v1/loyalty-content");
 
-    if (!response.ok) {
-      throw new Error("Failed to fetch loyalty content");
-    }
-
-    const identifiers = (await response.json()).loyalty_identifiers;
+    const identifiers = data.loyalty_identifiers;
 
     const cards: Card[] = [];
 
     await Promise.all(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      identifiers.map(async (identifier: any) => {
+      identifiers.map(async (identifier) => {
         let name = identifier.processed.name;
         if (identifier.processed.label) {
           name = `${identifier.processed.name} (${identifier.processed.label.trim()})`;
         }
 
         let logo = "";
-        if (
-          !identifier.is_custom_card &&
-          identifier.processed.visual.logo_url
-        ) {
-          logo = await toBase64(identifier.processed.visual.logo_url);
+        const logoUrl = identifier.processed.visual.logo_url;
+        if (!identifier.is_custom_card && logoUrl) {
+          logo = await retry(() => toBase64(logoUrl));
         }
 
         cards.push({
@@ -67,7 +63,7 @@ export default async function cards(req: NextApiRequest, res: NextApiResponse) {
               ? "qr"
               : "barcode",
           name: name,
-          code: identifier.processed.barcode.content,
+          code: identifier.processed.barcode.content.toString(),
           logo: logo,
           color: identifier.processed.visual.color,
         });

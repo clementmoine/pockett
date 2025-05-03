@@ -133,8 +133,11 @@ export function ProviderPicker({
           const provider = providers.find(
             (p) => p.provider_id === currentValue,
           );
-          onChange(currentValue, provider!);
-          setOpen(false);
+
+          if (provider) {
+            onChange(currentValue, provider);
+            setOpen(false);
+          }
         }}
       >
         {renderProviderCard(provider)}
