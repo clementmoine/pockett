@@ -228,6 +228,51 @@ export function Card({
     }
   };
 
+  function splitCode(
+    code: string,
+    chunkSize?: number,
+    separator: string = "\u00A0",
+  ): string {
+    if (!code || typeof code !== "string") {
+      return "";
+    }
+
+    function determineOptimalChunkSize(code: string): number {
+      if (code.length <= 9) {
+        return 3;
+      }
+
+      return 4;
+    }
+
+    const cleanCode = code.replace(/\s/g, "");
+
+    if (chunkSize === undefined) {
+      chunkSize = determineOptimalChunkSize(cleanCode);
+    }
+
+    const remainder = cleanCode.length % chunkSize;
+
+    if (remainder > 0) {
+      const firstChunk = cleanCode.substring(0, remainder);
+      const rest = cleanCode.substring(remainder);
+
+      const chunks = [firstChunk];
+      for (let i = 0; i < rest.length; i += chunkSize) {
+        chunks.push(rest.substring(i, i + chunkSize));
+      }
+
+      return chunks.join(separator);
+    } else {
+      const chunks = [];
+      for (let i = 0; i < cleanCode.length; i += chunkSize) {
+        chunks.push(cleanCode.substring(i, i + chunkSize));
+      }
+
+      return chunks.join(separator);
+    }
+  }
+
   return (
     <>
       <ContextMenu>
@@ -359,7 +404,7 @@ export function Card({
 
                   {!((type == "auto" && code.length > 26) || type == "qr") && (
                     <p className="text-sm leading-none text-black font-mono text-center w-full shrink-0 truncate">
-                      {code.trim().length > 1 ? code : "N/A"}
+                      {code.trim().length > 1 ? splitCode(code) : "N/A"}
                     </p>
                   )}
                 </Button>
