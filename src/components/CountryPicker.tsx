@@ -59,7 +59,7 @@ export function CountryPicker({
             "!text-muted-foreground": !currentCountry,
           })}
         >
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-2 shrink-0">
             {currentCountry?.flag && (
               <Image
                 src={currentCountry.flag}
@@ -69,7 +69,7 @@ export function CountryPicker({
               />
             )}
 
-            <span className="text-ellipsis overflow-hidden">
+            <span className="text-ellipsis overflow-hidden hidden sm:block">
               {showLabel && (currentCountry?.name || "Select a country")}
             </span>
           </span>
@@ -79,9 +79,9 @@ export function CountryPicker({
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="p-0 overflow-hidden"
+        className="p-0 overflow-hidden max-w-[50vw]"
         style={{
-          width: "var(--radix-popover-trigger-width)",
+          minWidth: "var(--radix-popover-trigger-width)",
         }}
       >
         <Command
@@ -91,6 +91,13 @@ export function CountryPicker({
             const country = countries.find((c) => c.code === code);
 
             if (!country) return 0;
+
+            const normalizedCountryCode = country?.code
+              .trim()
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/\s+/g, " ")
+              .replace(/[\u0300-\u036f]/g, "");
 
             const normalizedCountryName = country?.name
               .trim()
@@ -106,7 +113,10 @@ export function CountryPicker({
               .replace(/\s+/g, " ")
               .replace(/[\u0300-\u036f]/g, "");
 
-            return normalizedCountryName.includes(normalizedSearch) ? 1 : 0;
+            return normalizedCountryName.includes(normalizedSearch) ||
+              normalizedCountryCode.includes(normalizedSearch)
+              ? 1
+              : 0;
           }}
         >
           <CommandInput placeholder="Search..." className="h-9" />
@@ -128,6 +138,7 @@ export function CountryPicker({
                       alt={country.name}
                       width={20}
                       height={20}
+                      className="shrink-0"
                     />
                   )}
                   {country.name}

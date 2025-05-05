@@ -216,9 +216,9 @@ export function ProviderPicker({
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="p-0 overflow-hidden"
+        className="p-0 overflow-hidden max-w-[50vw]"
         style={{
-          width: "var(--radix-popover-trigger-width)",
+          minWidth: "var(--radix-popover-trigger-width)",
         }}
       >
         <Command

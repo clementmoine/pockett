@@ -37,14 +37,14 @@ export function ColorPicker({
         className="absolute left-1 size-8 p-0 rounded transition-all"
       >
         <div
-          className="size-4 rounded border"
+          className="size-4 rounded border pointer-events-none"
           style={{ backgroundColor: (value || internalValue) as string }}
         />
       </Button>
 
       <Input
         type="color"
-        className="absolute inset-0 w-full h-full !opacity-0 pointer-events-none"
+        className="absolute left-1 w-8 h-full opacity-0"
         value={value || internalValue}
         onChange={handleColorChange}
         {...fieldProps}
