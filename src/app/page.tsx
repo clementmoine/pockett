@@ -136,7 +136,7 @@ export default function Home() {
       {/* Header */}
       <header className="flex items-center justify-between p-4 border-b bg-background shadow-sm">
         <div className="flex items-center gap-2">
-          <GalleryVerticalEnd className="h-6 w-6 text-foreground" />
+          <GalleryVerticalEnd className="size-6 text-foreground" />
           <h1 className="text-lg font-semibold text-foreground">Pockett</h1>
         </div>
         <div className="flex items-center gap-2">

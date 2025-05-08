@@ -120,7 +120,7 @@ export function Card({
       {
         type: "action",
         label: "Open",
-        icon: <Fullscreen className="mr-2 h-4 w-4" />,
+        icon: <Fullscreen className="mr-2 size-4" />,
         onClick: () => setIsFullScreenDialogOpen(true),
         disabled: false,
       },
@@ -128,14 +128,14 @@ export function Card({
       onEditCard && {
         type: "action",
         label: "Edit",
-        icon: <PenSquare className="mr-2 h-4 w-4" />,
+        icon: <PenSquare className="mr-2 size-4" />,
         onClick: onEditCard,
         disabled: false,
       },
       onDeleteCard && {
         type: "action",
         label: "Delete",
-        icon: <Trash2 className="mr-2 h-4 w-4" />,
+        icon: <Trash2 className="mr-2 size-4" />,
         onClick: () => setIsDeleteDialogOpen(true),
         disabled: false,
       },
@@ -143,14 +143,14 @@ export function Card({
       onAddToWallet && {
         type: "action",
         label: "Add to Wallet",
-        icon: <WalletCards className="mr-2 h-4 w-4" />,
+        icon: <WalletCards className="mr-2 size-4" />,
         onClick: () => onAddToWallet(id),
         disabled: isOffline,
       },
       onShareCard && {
         type: "action",
         label: "Share",
-        icon: <Share className="mr-2 h-4 w-4" />,
+        icon: <Share className="mr-2 size-4" />,
         onClick: () => onShareCard(id),
         disabled: isOffline,
       },
@@ -305,7 +305,7 @@ export function Card({
                     width={128}
                     height={128}
                     alt="Card Logo"
-                    className="h-1/2 w-1/2 object-contain select-none"
+                    className="size-1/2 object-contain select-none"
                     draggable={false}
                   />
                 ) : (
@@ -379,7 +379,7 @@ export function Card({
                   }}
                   className="flex flex-1 !opacity-100 flex-col bg-white hover:!bg-white/90 rounded-md !px-[5%] !py-[5%] overflow-hidden w-full h-full gap-[10%]"
                 >
-                  <div className="flex flex-1 overflow-hidden h-full w-full justify-center items-center">
+                  <div className="flex flex-1 overflow-hidden size-full justify-center items-center">
                     {codeDataUrl != null && (
                       <Image
                         width={128}

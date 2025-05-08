@@ -56,7 +56,7 @@ export function Cards({
       {/* Empty state */}
       {cards.length === 0 && (
         <div className="flex flex-col items-center justify-center h-full">
-          <GalleryVerticalEnd className="h-16 w-16 text-foreground/50 mb-5" />
+          <GalleryVerticalEnd className="size-16 text-foreground/50 mb-5" />
           <p className="text-foreground text-center">No cards available</p>
           <p className="text-foreground text-center">
             Add a new card to get started
