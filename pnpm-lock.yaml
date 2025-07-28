@@ -1509,6 +1509,7 @@ packages:
   '@tanstack/query-core@5.75.5':
     resolution: {integrity: sha512-kPDOxtoMn2Ycycb76Givx2fi+2pzo98F9ifHL/NFiahEDpDwSVW6o12PRuQ0lQnBOunhRG5etatAhQij91M3MQ==}
 
+
   '@tanstack/react-query@5.75.5':
     resolution: {integrity: sha512-QrLCJe40BgBVlWdAdf2ZEVJ0cISOuEy/HKupId1aTKU6gPJZVhSvZpH+Si7csRflCJphzlQ77Yx6gUxGW9o0XQ==}
     peerDependencies:
@@ -4516,6 +4517,7 @@ snapshots:
       - typescript
 
   '@tanstack/query-core@5.75.5': {}
+
 
   '@tanstack/react-query@5.75.5(react@19.0.0)':
     dependencies:
