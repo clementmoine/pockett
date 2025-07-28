@@ -67,6 +67,7 @@ class KlarnaSession {
     }
 
     try {
+      console.log("Refreshing Klarna access token...");
       const response = await retry(() =>
         fetch("https://app.klarna.com/fr/api/auth/refresh", {
           method: "POST",
@@ -96,6 +97,9 @@ class KlarnaSession {
       }
 
       this.tokenInfo = data;
+
+      console.log("Klarna access token refreshed successfully.");
+
       return data.access_token;
     } catch (error) {
       console.error("Error refreshing access token:", error);
