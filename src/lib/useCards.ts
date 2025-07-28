@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { Card, Prisma } from "@prisma/client";
 
@@ -8,17 +8,19 @@ const CARDS_QUERY_KEY = ["cards"];
 const cardsApi = {
   getAll: async (): Promise<Card[]> => {
     const response = await fetch("/api/cards");
-    if (!response.ok) throw new Error("Failed to fetch cards");
+    if (!response.ok) return Promise.reject("Failed to fetch cards");
     return response.json();
   },
 
-  create: async (card: Prisma.CardCreateInput): Promise<Card> => {
+  create: async (
+    card: Omit<Card, "createdAt" | "updatedAt">,
+  ): Promise<Card> => {
     const response = await fetch("/api/cards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(card),
     });
-    if (!response.ok) throw new Error("Failed to create card");
+    if (!response.ok) return Promise.reject("Failed to create card");
     return response.json();
   },
 
@@ -28,7 +30,7 @@ const cardsApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(card),
     });
-    if (!response.ok) throw new Error("Failed to update card");
+    if (!response.ok) return Promise.reject("Failed to update card");
     return response.json();
   },
 
@@ -36,13 +38,11 @@ const cardsApi = {
     const response = await fetch(`/api/cards?id=${cardId}`, {
       method: "DELETE",
     });
-    if (!response.ok) throw new Error("Failed to delete card");
+    if (!response.ok) return Promise.reject("Failed to delete card");
   },
 };
 
 export function useCards() {
-  const queryClient = useQueryClient();
-
   const {
     data: cards = [],
     isLoading,
@@ -55,98 +55,28 @@ export function useCards() {
   });
 
   const addCardMutation = useMutation({
-    mutationFn: async ({
-      card,
-      ignoreExisting = false,
-    }: {
-      card: Omit<Card, "createdAt" | "updatedAt">;
-      ignoreExisting?: boolean;
-    }) => {
-      if (ignoreExisting) {
-        const currentCards =
-          queryClient.getQueryData<Card[]>(CARDS_QUERY_KEY) || [];
-
-        const alreadyExists = currentCards.some(
-          (c) => c.code === card.code && c.providerId === card.providerId,
-        );
-
-        if (alreadyExists) return currentCards;
-      }
-
-      return await cardsApi.create(card);
-    },
-    onMutate: async ({ card }) => {
-      await queryClient.cancelQueries({ queryKey: CARDS_QUERY_KEY });
-
-      const previousCards =
-        queryClient.getQueryData<Card[]>(CARDS_QUERY_KEY) || [];
-      queryClient.setQueryData<Card[]>(CARDS_QUERY_KEY, [
-        ...previousCards,
-        card as Card,
-      ]);
-
-      return { previousCards };
-    },
-    onError: (error, variables, context) => {
-      if (context?.previousCards) {
-        queryClient.setQueryData(CARDS_QUERY_KEY, context.previousCards);
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: CARDS_QUERY_KEY });
+    mutationFn: cardsApi.create,
+    onSuccess: () => {
+      // Optionnel : refetch les cartes après une modification
+      refetch();
     },
   });
 
   // Mutation pour supprimer une carte
   const deleteCardMutation = useMutation({
     mutationFn: cardsApi.delete,
-    onMutate: async (cardId) => {
-      await queryClient.cancelQueries({ queryKey: CARDS_QUERY_KEY });
-
-      const previousCards =
-        queryClient.getQueryData<Card[]>(CARDS_QUERY_KEY) || [];
-      const updatedCards = previousCards.filter((card) => card.id !== cardId);
-      queryClient.setQueryData<Card[]>(CARDS_QUERY_KEY, updatedCards);
-
-      return { previousCards };
-    },
-    onError: (error, variables, context) => {
-      if (context?.previousCards) {
-        queryClient.setQueryData(CARDS_QUERY_KEY, context.previousCards);
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: CARDS_QUERY_KEY });
+    onSuccess: () => {
+      // Optionnel : refetch les cartes après une modification
+      refetch();
     },
   });
 
   // Mutation pour modifier une carte
   const patchCardMutation = useMutation({
     mutationFn: cardsApi.update,
-    onMutate: async (updatedCard) => {
-      await queryClient.cancelQueries({ queryKey: CARDS_QUERY_KEY });
-
-      const previousCards =
-        queryClient.getQueryData<Card[]>(CARDS_QUERY_KEY) || [];
-      const updatedCards = previousCards.map((card) =>
-        card.id === updatedCard.id
-          ? ({
-              ...card,
-              ...updatedCard,
-            } as Card)
-          : card,
-      );
-      queryClient.setQueryData<Card[]>(CARDS_QUERY_KEY, updatedCards);
-
-      return { previousCards };
-    },
-    onError: (error, variables, context) => {
-      if (context?.previousCards) {
-        queryClient.setQueryData(CARDS_QUERY_KEY, context.previousCards);
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: CARDS_QUERY_KEY });
+    onSuccess: () => {
+      // Optionnel : refetch les cartes après une modification
+      refetch();
     },
   });
 
@@ -171,10 +101,8 @@ export function useCards() {
     error,
 
     // Actions
-    addNewCard: (
-      card: Omit<Card, "createdAt" | "updatedAt">,
-      ignoreExisting?: boolean,
-    ) => addCardMutation.mutateAsync({ card, ignoreExisting }),
+    addNewCard: (card: Omit<Card, "createdAt" | "updatedAt">) =>
+      addCardMutation.mutateAsync(card),
     deleteCard: (cardId: Card["id"]) => deleteCardMutation.mutateAsync(cardId),
     patchCard: (card: Prisma.CardUpdateInput) =>
       patchCardMutation.mutateAsync(card),

@@ -78,17 +78,30 @@ export default function Home() {
   );
 
   const handleImport = useCallback(
-    async (cards: Card[], ignoreExisting?: boolean) => {
-      try {
-        for (const card of cards) {
-          await addNewCard(card, ignoreExisting);
+    async (cards: Card[]) => {
+      let successCount = 0;
+
+      for (const card of cards) {
+        try {
+          await addNewCard(card);
+          successCount++;
+          toast.success(`Card ${card.name || "Unknown"} imported successfully`);
+        } catch (error) {
+          console.error("Error importing card:", card, error);
+          toast.error(`Failed to import card: ${card.name || "Unknown"}`);
         }
+      }
+
+      if (successCount > 0) {
         toast.success(
-          `${cards?.length ?? 0} card${(cards?.length ?? 0) > 1 ? "s" : ""} imported successfully`,
+          `${successCount} card${successCount > 1 ? "s" : ""} imported successfully`,
         );
-      } catch (error) {
-        console.error("Error importing cards:", error);
-        toast.error("Failed to import cards");
+      }
+
+      if (successCount < cards.length) {
+        toast.error(
+          `Some cards failed to import (${cards.length - successCount} / ${cards.length})`,
+        );
       }
     },
     [addNewCard],

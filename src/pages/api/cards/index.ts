@@ -100,16 +100,6 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     });
   }
 
-  // Check the provider exists if providerId is provided
-  if (providerId) {
-    const provider = await prisma.provider.findUnique({
-      where: { id: providerId },
-    });
-    if (!provider) {
-      return res.status(400).json({ error: "Provider not found" });
-    }
-  }
-
   // Validate provider exists if providerId is being updated
   if ("providerId" in req.body) {
     if (providerId !== null) {
@@ -120,6 +110,19 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
         return res.status(400).json({ error: "Provider not found" });
       }
     }
+  }
+
+  const existingCard = await prisma.card.findFirst({
+    where: {
+      code,
+      providerId: providerId || null,
+    },
+  });
+
+  if (existingCard) {
+    return res
+      .status(409)
+      .json({ error: "Card with same code and provider already exists" });
   }
 
   const card = await prisma.card.create({

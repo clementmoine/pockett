@@ -60,7 +60,7 @@ export function ImportModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (cards: Card[], ignoreExisting?: boolean) => Promise<void>;
+  onImport: (cards: Card[]) => Promise<void>;
 }) {
   const form = useForm<FormValues>({
     resolver: zodResolver(importSchema),
@@ -101,7 +101,7 @@ export function ImportModal({
 
       const data = await response.json();
       if (Array.isArray(data)) {
-        onImport(data, true);
+        onImport(data);
         handleClose();
       } else {
         toast.error("Invalid data format from Klarna");
