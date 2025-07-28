@@ -1,108 +1,95 @@
-import path from "path";
-import fs from "fs/promises";
 import { NextApiRequest, NextApiResponse } from "next";
+import { PrismaClient } from "@prisma/client";
 
 import { retry } from "@/lib/retry";
 import { klarnaSession } from "@/lib/session";
 
-import type { Country } from "@/types/country";
-import type { Provider } from "@/types/provider";
+import type { Country } from "@prisma/client";
+import type { RawProvider, ProviderWithVisual } from "@/types/provider";
 
+const prisma = new PrismaClient();
 const CACHE_TTL = 1000 * 60 * 60 * 24 * 30; // 30 days
-const BASE_DIR = path.join(process.cwd(), ".next", "cache", "data", "klarna");
-const PROVIDERS_DIR = path.join(BASE_DIR, "providers");
-const METADATA_FILE = path.join(BASE_DIR, "metadata.json");
 
-interface ProviderMetadata {
-  providerId: string;
-  lastUpdated: number;
-  hasLogo: boolean;
-}
-
-interface CacheMetadata {
-  lastFetched: number;
-  providers: ProviderMetadata[];
-}
-
-async function readMetadata(): Promise<CacheMetadata | null> {
+async function downloadAndConvertLogo(logoUrl: string): Promise<string | null> {
   try {
-    const content = await fs.readFile(METADATA_FILE, "utf-8");
-    return JSON.parse(content) as CacheMetadata;
-  } catch {
-    return null;
-  }
-}
+    const response = await retry(() => fetch(logoUrl));
 
-async function writeMetadata(metadata: CacheMetadata): Promise<void> {
-  try {
-    await fs.mkdir(BASE_DIR, { recursive: true });
-    await fs.writeFile(METADATA_FILE, JSON.stringify(metadata), "utf-8");
-  } catch (err) {
-    console.error("Failed to write metadata file", err);
-  }
-}
+    if (response.ok) {
+      const buffer = Buffer.from(await response.arrayBuffer());
 
-// Get the JSON path to the provider in cache
-async function getProviderFilePath(providerId: string): Promise<string> {
-  await fs.mkdir(PROVIDERS_DIR, { recursive: true });
-  return path.join(PROVIDERS_DIR, `${providerId}.json`);
-}
-
-async function saveProviderData(provider: Provider): Promise<Provider> {
-  // Download and convert logo
-  if (provider.visual.logo_url) {
-    const originalLogoUrl = provider.visual.logo_url;
-
-    try {
-      const response = await retry(() => fetch(originalLogoUrl));
-
-      if (response.ok) {
-        const buffer = Buffer.from(await response.arrayBuffer());
-
-        let mimeType = "image/png";
-        if (
-          originalLogoUrl.toLowerCase().endsWith(".jpg") ||
-          originalLogoUrl.toLowerCase().endsWith(".jpeg")
-        ) {
-          mimeType = "image/jpeg";
-        } else if (originalLogoUrl.toLowerCase().endsWith(".svg")) {
-          mimeType = "image/svg+xml";
-        }
-
-        const base64Data = buffer.toString("base64");
-        const dataUrl = `data:${mimeType};base64,${base64Data}`;
-
-        // Save the logo url as base64
-        provider.visual.logo_url = dataUrl;
+      let mimeType = "image/png";
+      if (
+        logoUrl.toLowerCase().endsWith(".jpg") ||
+        logoUrl.toLowerCase().endsWith(".jpeg")
+      ) {
+        mimeType = "image/jpeg";
+      } else if (logoUrl.toLowerCase().endsWith(".svg")) {
+        mimeType = "image/svg+xml";
       }
-    } catch (err) {
-      console.error(
-        `Failed to download and convert logo for ${provider.provider_id}`,
-        err,
-      );
+
+      const base64Data = buffer.toString("base64");
+      return `data:${mimeType};base64,${base64Data}`;
     }
+  } catch (err) {
+    console.error(`Failed to download and convert logo from ${logoUrl}`, err);
   }
-
-  // Save the providers data with logo in base64
-  const filePath = await getProviderFilePath(provider.provider_id);
-  await fs.writeFile(filePath, JSON.stringify(provider), "utf-8");
-
-  return provider;
+  return null;
 }
 
-async function readProviderData(providerId: string): Promise<Provider | null> {
-  try {
-    const filePath = await getProviderFilePath(providerId);
-    const content = await fs.readFile(filePath, "utf-8");
-    return JSON.parse(content) as Provider;
-  } catch {
-    return null;
+async function saveProvider(rawProvider: RawProvider): Promise<void> {
+  // Download and convert logo if needed
+  let logoUrl = rawProvider.visual.logo_url || null;
+  if (logoUrl) {
+    const base64Logo = await downloadAndConvertLogo(logoUrl);
+    logoUrl = base64Logo || logoUrl; // Keep original if conversion fails
   }
+
+  // Upsert provider with visual
+  await prisma.provider.upsert({
+    where: { id: rawProvider.provider_id },
+    update: {
+      name: rawProvider.provider_name,
+      markets: JSON.stringify(rawProvider.markets),
+      inputType: rawProvider.input_type,
+      expectedManualInputCharacterSet:
+        rawProvider.expected_manual_input_character_set,
+      searchTerms: JSON.stringify(rawProvider.search_terms),
+      defaultBarcodeFormat: rawProvider.default_barcode_format,
+      updatedAt: new Date(),
+      visual: {
+        upsert: {
+          create: {
+            logoUrl,
+            color: rawProvider.visual.color,
+          },
+          update: {
+            logoUrl,
+            color: rawProvider.visual.color,
+          },
+        },
+      },
+    },
+    create: {
+      id: rawProvider.provider_id,
+      name: rawProvider.provider_name,
+      markets: JSON.stringify(rawProvider.markets),
+      inputType: rawProvider.input_type,
+      expectedManualInputCharacterSet:
+        rawProvider.expected_manual_input_character_set,
+      searchTerms: JSON.stringify(rawProvider.search_terms),
+      defaultBarcodeFormat: rawProvider.default_barcode_format,
+      visual: {
+        create: {
+          logoUrl,
+          color: rawProvider.visual.color,
+        },
+      },
+    },
+  });
 }
 
-// Fetch, process and save providers
-async function fetchAndSaveProviders(): Promise<Provider[]> {
-  const data = await klarnaSession.request<{ providers: Provider[] }>(
+async function fetchAndSaveProviders(): Promise<ProviderWithVisual[]> {
+  const data = await klarnaSession.request<{ providers: RawProvider[] }>(
     "/fr/api/consumer_wallet_bff/v1/all-providers",
   );
 
@@ -110,48 +97,62 @@ async function fetchAndSaveProviders(): Promise<Provider[]> {
     throw new Error("Invalid response format from Klarna API");
   }
 
-  const providers = data.providers as Provider[];
+  const providers = data.providers;
 
   // Process each provider in parallel
-  const processedProviders = await Promise.all(
+  await Promise.all(
     providers.map(async (provider) => {
-      return await saveProviderData(provider);
+      await saveProvider(provider);
     }),
   );
 
-  // Update metadata
-  const metadata: CacheMetadata = {
-    lastFetched: Date.now(),
-    providers: processedProviders.map((p) => ({
-      providerId: p.provider_id,
-      lastUpdated: Date.now(),
-      hasLogo: !!p.visual.logo_url,
-    })),
-  };
-  await writeMetadata(metadata);
-
-  return processedProviders;
+  // Return providers from database to ensure consistency
+  return await loadProviders();
 }
 
-// Load providers from cache
-async function loadProviders(metadata: CacheMetadata): Promise<Provider[]> {
-  // Load providers ids
-  const providerIds = metadata.providers.map((p) => p.providerId);
+async function loadProviders(): Promise<ProviderWithVisual[]> {
+  const providers = await prisma.provider.findMany({
+    include: { visual: true },
+    orderBy: { name: "asc" },
+  });
 
-  // Load each provider in parallel
-  const providers = await Promise.all(
-    providerIds.map(async (id) => {
-      return await readProviderData(id);
-    }),
-  );
+  return providers.map((provider) => {
+    const formattedPrivider: ProviderWithVisual = { ...provider };
 
-  // Filter invalid
-  const validProviders = providers.filter((p): p is Provider => p !== null);
+    formattedPrivider.visual = {
+      logoUrl: provider.visual?.logoUrl || null,
+      color: provider.visual?.color || "#000000",
+    };
 
-  return validProviders;
+    return formattedPrivider;
+  });
 }
 
-export default async function handlers(
+async function isCacheExpired(): Promise<boolean> {
+  try {
+    // Check if we have any providers and when they were last updated
+    const latestProvider = await prisma.provider.findFirst({
+      orderBy: {
+        updatedAt: "desc",
+      },
+      select: {
+        updatedAt: true,
+      },
+    });
+
+    if (!latestProvider) {
+      return true; // No providers in DB, need to fetch
+    }
+
+    const timeSinceUpdate = Date.now() - latestProvider.updatedAt.getTime();
+    return timeSinceUpdate >= CACHE_TTL;
+  } catch (error) {
+    console.error("Error checking cache expiration:", error);
+    return true; // On error, assume cache is expired
+  }
+}
+
+export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
@@ -160,30 +161,32 @@ export default async function handlers(
   }
 
   try {
-    const metadata = await readMetadata();
-    const ignoreCache = req.query?.ignoreCache === "true";
-    const isExpired =
-      !metadata ||
-      ignoreCache ||
-      Date.now() - metadata.lastFetched >= CACHE_TTL;
-
-    let providers: Provider[];
     const country = req.query.country as Country | undefined;
     if (!country) {
       return res.status(400).json({ error: "Missing 'country' query param" });
     }
 
-    // Expired cache data
+    const ignoreCache = req.query?.ignoreCache === "true";
+    const isExpired = ignoreCache || (await isCacheExpired());
+
+    let providers: ProviderWithVisual[];
+
     if (isExpired) {
+      console.log(
+        "Cache expired or ignored, fetching fresh data from Klarna API",
+      );
       providers = await fetchAndSaveProviders();
     } else {
-      // Load from cache
-      providers = await loadProviders(metadata);
+      console.log("Loading providers from database");
+      providers = await loadProviders();
     }
 
-    providers = providers.filter((p) => p.markets.includes(country));
+    // Filter providers by country
+    const filteredProviders = providers.filter((p) =>
+      JSON.parse(p.markets).includes(country),
+    );
 
-    return res.status(200).json(providers);
+    return res.status(200).json(filteredProviders);
   } catch (error) {
     console.error("API error:", error);
     res.status(500).json({
@@ -191,5 +194,7 @@ export default async function handlers(
         error instanceof Error ? error.message : String(error)
       }`,
     });
+  } finally {
+    await prisma.$disconnect();
   }
 }

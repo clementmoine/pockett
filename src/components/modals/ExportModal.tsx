@@ -26,7 +26,7 @@ import {
   Form,
 } from "@/components/ui/form";
 
-import type { Card as CardType } from "@/types/card";
+import type { Card as CardType } from "@prisma/client";
 
 const importSchema = z.object({
   json: z

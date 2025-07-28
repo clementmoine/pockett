@@ -1,0 +1,136 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Provider {
+  id                                     String   @id @default(cuid())
+  name                                   String
+  markets                                String   // JSON String array of countries
+  inputType                              InputType @map("input_type")
+  expectedManualInputCharacterSet        CharacterSet @map("expected_manual_input_character_set")
+  searchTerms                            String   // JSON string array of search terms
+  defaultBarcodeFormat                   BarcodeFormat @map("default_barcode_format")
+  createdAt                              DateTime @default(now())
+  updatedAt                              DateTime @updatedAt
+  
+  // Relations
+  visual                                 ProviderVisual?
+  cards                                  Card[]
+  
+  @@map("providers")
+}
+
+model ProviderVisual {
+  id         String   @id @default(cuid())
+  logoUrl    String?  @map("logo_url")
+  color      String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  providerId String   @unique @map("provider_id")
+  
+  @@map("provider_visuals")
+}
+
+model Card {
+  id          String    @id @default(cuid())
+  name        String
+  code        String
+  logo        String?
+  color       String
+  type        CardType
+  country     Country?
+  providerId  String?   @map("provider_id")
+  provider    Provider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@map("cards")
+}
+
+enum InputType {
+  BARCODE_SCANNER
+  MANUAL
+}
+
+enum CharacterSet {
+  NO_RESTRICTIONS
+  NUMERIC
+}
+
+enum BarcodeFormat {
+  CODABAR
+  CODE_128
+  EAN_8
+  EAN_13
+  CODE_39
+  QR_CODE
+  ITF
+  UPC_A
+  DATA_MATRIX
+  PDF_417
+  GS1_128
+  AZTEC
+  CODE_93
+  RSS_DATABAR_EXPANDED
+}
+
+enum CardType {
+  barcode
+  qr
+  auto
+}
+
+enum Country {
+  JP
+  KR
+  CN
+  RU
+  IT
+  NL
+  TW
+  DE
+  FR
+  BE
+  SK
+  HU
+  SI
+  PL
+  CH
+  CZ
+  UA
+  LU
+  PT
+  RO
+  ES
+  HR
+  TR
+  HK
+  AU
+  GB
+  US
+  ID
+  SG
+  NZ
+  IE
+  ZA
+  AT
+  BG
+  BR
+  CA
+  DK
+  FI
+  GR
+  IL
+  IN
+  MX
+  NO
+  SE
+  TH
+}

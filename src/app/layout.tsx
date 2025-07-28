@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 
 import { Toaster } from "@/components/ui/sonner";
-import { ThemeProvider } from "@/components/theme-provider";
+
+import { ThemeProvider } from "@/providers/ThemeProvider";
+import ReactQueryProvider from "@/providers/ReactQueryProvider";
 
 import "./globals.css";
 
@@ -47,15 +49,17 @@ export default function RootLayout({
     // Suppress hydration warning for the html tag due to the theme provider
     <html lang="en" dir="ltr" suppressHydrationWarning>
       <body>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-          <Toaster />
-        </ThemeProvider>
+        <ReactQueryProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+            <Toaster />
+          </ThemeProvider>
+        </ReactQueryProvider>
       </body>
     </html>
   );

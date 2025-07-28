@@ -1,8 +1,6 @@
 "use client";
 
 import { toast } from "sonner";
-import { v4 as uuidv4 } from "uuid";
-import { createHash } from "crypto";
 import { useCallback, useMemo, useState } from "react";
 import {
   GalleryVerticalEnd,
@@ -24,15 +22,9 @@ import { ExportModal } from "@/components/modals/ExportModal";
 import { ImportModal } from "@/components/modals/ImportModal";
 import { Cards } from "@/components/Cards";
 
-import { useCardStorage } from "@/lib/useCardStorage";
+import { useCards } from "@/lib/useCards";
 
-import type { Card } from "@/types/card";
-
-const generateNumericId = () => {
-  const uuid = uuidv4();
-  const hash = createHash("sha256").update(uuid).digest("hex");
-  return parseInt(hash.slice(0, 12), 16);
-};
+import type { Card } from "@prisma/client";
 
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState<
@@ -41,8 +33,7 @@ export default function Home() {
   const [editingCard, setEditingCard] = useState<Card | undefined>(undefined);
   const [exportCards, setExportCards] = useState<Card[] | undefined>(undefined);
 
-  const { cards, getCard, addNewCard, deleteCard, patchCard } =
-    useCardStorage();
+  const { cards, getCard, addNewCard, deleteCard, patchCard } = useCards();
 
   const isApple = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -52,37 +43,36 @@ export default function Home() {
 
   const addToWallet = useCallback(
     (id: Card["id"]) => {
-      getCard(id).then((card) => {
-        if (card) {
-          fetch("/api/pass/generate", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              platform: isApple ? "apple" : "google",
-              ...card,
-            }),
+      const card = getCard(id);
+      if (card) {
+        fetch("/api/pass/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            platform: isApple ? "apple" : "google",
+            ...card,
+          }),
+        })
+          .then((response) => {
+            if (!response.ok) {
+              return response.json().then((err) => {
+                throw new Error(err.error || "Failed to generate pass");
+              });
+            }
+            return response.json();
           })
-            .then((response) => {
-              if (!response.ok) {
-                return response.json().then((err) => {
-                  throw new Error(err.error || "Failed to generate pass");
-                });
-              }
-              return response.json();
-            })
-            .then((data) => {
-              const { cardUrl } = data;
-              window.location.href = cardUrl;
-              toast.success(`${card.name} card pass generated successfully`);
-            })
-            .catch((error) => {
-              console.error("Error generating pass:", error);
-              toast.error("Failed to generate pass");
-            });
-        }
-      });
+          .then((data) => {
+            const { cardUrl } = data;
+            window.location.href = cardUrl;
+            toast.success(`${card.name} card pass generated successfully`);
+          })
+          .catch((error) => {
+            console.error("Error generating pass:", error);
+            toast.error("Failed to generate pass");
+          });
+      }
     },
     [getCard, isApple],
   );
@@ -91,10 +81,7 @@ export default function Home() {
     async (cards: Card[], ignoreExisting?: boolean) => {
       try {
         for (const card of cards) {
-          await addNewCard(
-            { ...card, id: generateNumericId() },
-            ignoreExisting,
-          );
+          await addNewCard(card, ignoreExisting);
         }
         toast.success(
           `${cards?.length ?? 0} card${(cards?.length ?? 0) > 1 ? "s" : ""} imported successfully`,
@@ -109,13 +96,13 @@ export default function Home() {
 
   const handleShareCard = useCallback(
     (id: Card["id"]) => {
-      getCard(id).then((card) => {
-        if (card) {
-          // Open the sharing modal instead
-          setExportCards([card]);
-          setIsModalOpen("export");
-        }
-      });
+      const card = getCard(id);
+
+      if (card) {
+        // Open the sharing modal instead
+        setExportCards([card]);
+        setIsModalOpen("export");
+      }
     },
     [getCard],
   );

@@ -1,13 +1,14 @@
 import { NextApiRequest, NextApiResponse } from "next";
 
-import type { Card } from "@/types/card";
-import { Provider } from "@/types/provider";
+import { RawProvider } from "@/types/provider";
 
 import { retry } from "@/lib/retry";
 import { toBase64 } from "@/lib/toBase64";
 import { klarnaSession } from "@/lib/session";
 
-let cachedResponse: Card[] | null = null;
+import type { Card } from "@prisma/client";
+
+let cachedResponse: Omit<Card, "updatedAt" | "createdAt">[] | null = null;
 let cachedAt: number | null = null;
 
 const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
@@ -25,12 +26,12 @@ export default async function cards(req: NextApiRequest, res: NextApiResponse) {
         {
           is_custom_card: boolean;
           processed: {
-            provider_id: Provider["provider_id"];
-            name: Provider["provider_name"];
+            provider_id: RawProvider["provider_id"];
+            name: RawProvider["provider_name"];
             label: string;
-            visual: Provider["visual"];
+            visual: RawProvider["visual"];
             barcode: {
-              format: Provider["default_barcode_format"];
+              format: RawProvider["default_barcode_format"];
               content: string | number;
             };
           };
@@ -40,7 +41,7 @@ export default async function cards(req: NextApiRequest, res: NextApiResponse) {
 
     const identifiers = data.loyalty_identifiers;
 
-    const cards: Card[] = [];
+    const cards: Omit<Card, "updatedAt" | "createdAt">[] = [];
 
     await Promise.all(
       identifiers.map(async (identifier) => {
@@ -56,8 +57,8 @@ export default async function cards(req: NextApiRequest, res: NextApiResponse) {
         }
 
         cards.push({
-          id: -1,
-          provider: identifier.processed.provider_id,
+          id: "-1",
+          providerId: identifier.processed.provider_id,
           type:
             identifier.processed.barcode.format === "QR_CODE"
               ? "qr"
@@ -66,6 +67,7 @@ export default async function cards(req: NextApiRequest, res: NextApiResponse) {
           code: identifier.processed.barcode.content.toString(),
           logo: logo,
           color: identifier.processed.visual.color,
+          country: null,
         });
       }),
     );

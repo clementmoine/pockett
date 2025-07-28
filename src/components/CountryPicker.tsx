@@ -20,8 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 
 import { cn } from "@/lib/utils";
-
-import { COUNTRIES } from "@/types/country";
+import { Country } from "@prisma/client";
 
 export function CountryPicker({
   value,
@@ -35,13 +34,15 @@ export function CountryPicker({
   const [open, setOpen] = useState(false);
 
   const countries = useMemo(() => {
-    return COUNTRIES.map((code) => ({
-      code,
-      name: new Intl.DisplayNames(["en"], { type: "region" }).of(code)!,
-      flag: `https://flagcdn.com/${code.toLowerCase()}.svg`,
-    })).sort((a, b) => {
-      return a.name.localeCompare(b.name);
-    });
+    return Object.values(Country)
+      .map((code) => ({
+        code,
+        name: new Intl.DisplayNames(["en"], { type: "region" }).of(code)!,
+        flag: `https://flagcdn.com/${code.toLowerCase()}.svg`,
+      }))
+      .sort((a, b) => {
+        return a.name.localeCompare(b.name);
+      });
   }, []);
 
   const currentCountry = useMemo(() => {
@@ -55,23 +56,31 @@ export function CountryPicker({
           variant="outline"
           role="combobox"
           aria-expanded="false"
-          className={cn("w-full justify-between", {
+          className={cn("flex overflow-hidden w-full justify-between", {
             "!text-muted-foreground": !currentCountry,
           })}
         >
-          <span className="flex items-center gap-2 shrink-0">
+          <span className="flex items-center gap-2 shrink-0 flex-1 overflow-hidden">
             {currentCountry?.flag && (
               <Image
                 src={currentCountry.flag}
                 alt={currentCountry.name}
                 width={20}
                 height={20}
+                className="shrink-0"
               />
             )}
 
-            <span className="text-ellipsis overflow-hidden hidden sm:block">
-              {showLabel && (currentCountry?.name || "Select a country")}
-            </span>
+            {showLabel && (
+              <>
+                <span className="text-ellipsis overflow-hidden hidden sm:block">
+                  {currentCountry?.name || "Select a country"}
+                </span>
+                <span className="text-ellipsis overflow-hidden block sm:hidden">
+                  {currentCountry?.code || "Country"}
+                </span>
+              </>
+            )}
           </span>
 
           <ChevronsUpDown className="opacity-50" />

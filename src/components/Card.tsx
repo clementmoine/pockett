@@ -49,12 +49,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import type { Card as CardType } from "@/types/card";
+import type { Card as CardType } from "@prisma/client";
 
 import { cn } from "@/lib/utils";
 
-export interface CardProps extends CardType {
-  onDeleteCard?: (id: CardType["id"]) => Promise<void>;
+export interface CardProps
+  extends Omit<CardType, "updatedAt" | "createdAt" | "country" | "providerId"> {
+  onDeleteCard?: (id: CardType["id"]) => void;
   onEditCard?: () => void;
   onAddToWallet?: (id: CardType["id"]) => void;
   onShareCard?: (id: CardType["id"]) => void;
@@ -114,7 +115,7 @@ export function Card({
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   const actions: ActionItem[] | undefined = useMemo(() => {
-    if (!id || id == -1) return undefined;
+    if (!id || id == "-1") return undefined;
 
     const actionItems = [
       {
@@ -448,7 +449,7 @@ export function Card({
             </DialogHeader>
           </VisuallyHidden>
           <Card
-            id={-1}
+            id="-1"
             name={name}
             logo={logo}
             color={cardColor}
