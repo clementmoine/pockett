@@ -3,7 +3,7 @@ import sharp from "sharp";
 import { dataUriToBuffer } from "data-uri-to-buffer";
 import type { NextApiRequest, NextApiResponse } from "next";
 
-import type { Card } from "@/types/card";
+import { Card } from "@prisma/client";
 
 export const config = {
   api: {

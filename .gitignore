@@ -46,3 +46,5 @@ certificates
 # Serwist
 public/sw*
 public/swe-worker*
+prisma/providers.json
+prisma/dev.db

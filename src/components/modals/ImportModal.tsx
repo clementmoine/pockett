@@ -29,7 +29,7 @@ import {
 import Klarna from "@/images/klarna.svg";
 import Image from "next/image";
 
-import type { Card } from "@/types/card";
+import type { Card } from "@prisma/client";
 
 const importSchema = z.object({
   json: z

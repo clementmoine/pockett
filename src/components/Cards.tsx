@@ -5,7 +5,7 @@ import { GalleryVerticalEnd } from "lucide-react";
 
 import { Card } from "@/components/Card";
 
-import type { Card as CardType } from "@/types/card";
+import type { Card as CardType } from "@prisma/client";
 
 import styles from "./Cards.module.css";
 
@@ -17,20 +17,13 @@ export function Cards({
   onShareCard,
 }: {
   cards: CardType[];
-  onDeleteCard: (id: CardType["id"]) => Promise<void>;
+  onDeleteCard: (id: CardType["id"]) => void;
   onEditCard: (card: CardType) => void;
   onAddToWallet: (id: CardType["id"]) => void;
   onShareCard: (id: CardType["id"]) => void;
 }) {
   const sortedCards = useMemo(
-    () =>
-      [...cards].sort((a, b) => {
-        const nameA = a.name.toLowerCase();
-        const nameB = b.name.toLowerCase();
-        if (nameA < nameB) return -1;
-        if (nameA > nameB) return 1;
-        return 0;
-      }),
+    () => [...cards].sort((a, b) => a.name.localeCompare(b.name)),
     [cards],
   );
 

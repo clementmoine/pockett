@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { v4 as uuidv4 } from "uuid";
-import { createHash } from "crypto";
 import { toast } from "sonner";
 import color from "color";
 
@@ -33,15 +31,17 @@ import { ColorPicker } from "@/components/ColorPicker";
 import { CountryPicker } from "@/components/CountryPicker";
 import { ProviderPicker } from "@/components/ProviderPicker";
 
-import type { Card as CardType } from "@/types/card";
-import type { Provider as ProviderType } from "@/types/provider";
-import { COUNTRIES } from "@/types/country";
+import { Card as CardType, Country } from "@prisma/client";
+import type { ProviderWithVisual as ProviderType } from "@/types/provider";
 
 import { cn } from "@/lib/utils";
 
+const zodEnumFromPrisma = <T extends Record<string, string>>(prismaEnum: T) =>
+  z.enum([...Object.values(prismaEnum)] as [T[keyof T], ...T[keyof T][]]);
+
 const cardSchema = z.object({
-  country: z.enum(COUNTRIES).optional(),
-  provider: z.string().trim().optional(),
+  country: zodEnumFromPrisma(Country).optional(),
+  providerId: z.string().trim().optional(),
   name: z
     .string()
     .trim()
@@ -78,12 +78,6 @@ const cardSchema = z.object({
 
 type FormValues = z.infer<typeof cardSchema>;
 
-const generateNumericId = () => {
-  const uuid = uuidv4();
-  const hash = createHash("sha256").update(uuid).digest("hex");
-  return parseInt(hash.slice(0, 12), 16);
-};
-
 const convertFileToBase64 = async (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -107,7 +101,7 @@ const fetchLogoFromUrl = async (url: string): Promise<string | null> => {
 };
 
 const defaultValues: FormValues = {
-  provider: "",
+  providerId: "",
   name: "",
   code: "",
   logo: null,
@@ -125,8 +119,8 @@ export function FormModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onAddCard: (card: CardType) => Promise<void>;
-  onEditCard?: (card: CardType) => Promise<void>;
+  onAddCard: (card: Omit<CardType, "createdAt" | "updatedAt">) => void;
+  onEditCard?: (card: Omit<CardType, "createdAt" | "updatedAt">) => void;
   card?: CardType;
 }) {
   const [logoPreview, setLogoPreview] = useState<string | null>(
@@ -144,7 +138,7 @@ export function FormModal({
     if (card) {
       reset({
         country: card.country || defaultValues.country,
-        provider: card.provider || defaultValues.provider,
+        providerId: card.providerId || defaultValues.providerId,
         name: card.name || defaultValues.name,
         code: card.code || defaultValues.code,
         logo: card.logo || defaultValues.logo,
@@ -159,8 +153,8 @@ export function FormModal({
   }, [card, reset]);
 
   const handleProviderChange = async (provider: ProviderType) => {
-    if (provider.visual.logo_url) {
-      const base64 = await fetchLogoFromUrl(provider.visual.logo_url);
+    if (provider.visual?.logoUrl) {
+      const base64 = await fetchLogoFromUrl(provider.visual.logoUrl);
       form.setValue("logo", base64);
       setLogoPreview(base64);
     }
@@ -169,13 +163,13 @@ export function FormModal({
       !form.getFieldState("name").isTouched ||
       form.watch("name").length < 1
     ) {
-      form.setValue("name", provider.provider_name);
+      form.setValue("name", provider.name);
     }
 
-    form.setValue("color", provider.visual.color);
+    form.setValue("color", provider.visual?.color || "#000000");
     form.setValue(
       "type",
-      provider.default_barcode_format === "QR_CODE" ? "qr" : "barcode",
+      provider.defaultBarcodeFormat === "QR_CODE" ? "qr" : "barcode",
     );
   };
 
@@ -209,15 +203,15 @@ export function FormModal({
       logo = await convertFileToBase64(values.logo);
     }
 
-    const updatedCard: CardType = {
-      provider: values.provider,
+    const updatedCard: Omit<CardType, "createdAt" | "updatedAt"> = {
+      providerId: values.providerId || null,
       type: values.type,
-      id: card ? card.id : generateNumericId(),
+      id: card ? card.id : "-1",
       name: values.name,
       code: values.code,
       logo: logo,
       color: values.color,
-      country: values.country,
+      country: values.country || null,
     };
 
     if (card && onEditCard) {
@@ -279,7 +273,7 @@ export function FormModal({
                     })}
                   >
                     <Card
-                      id={-1}
+                      id="-1"
                       type="auto"
                       name={form.watch("name")}
                       color={form.watch("color")}
@@ -297,7 +291,7 @@ export function FormModal({
                     })}
                   >
                     <Card
-                      id={-1}
+                      id="-1"
                       type="qr"
                       name={form.watch("name")}
                       color={form.watch("color")}
@@ -316,7 +310,7 @@ export function FormModal({
                     })}
                   >
                     <Card
-                      id={-1}
+                      id="-1"
                       type="barcode"
                       name={form.watch("name")}
                       color={form.watch("color")}
@@ -351,7 +345,7 @@ export function FormModal({
 
                 <FormField
                   control={form.control}
-                  name="provider"
+                  name="providerId"
                   render={({ field }) => (
                     <FormItem className="flex-1">
                       <FormLabel className="text-foreground">
@@ -363,7 +357,7 @@ export function FormModal({
                           suggestFrom={form.watch("name")}
                           {...field}
                           onChange={(
-                            id: ProviderType["provider_id"],
+                            id: ProviderType["id"],
                             provider: ProviderType,
                           ) => {
                             field.onChange(id);
