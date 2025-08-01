@@ -35,6 +35,7 @@ import { Card as CardType, Country } from "@prisma/client";
 import type { ProviderWithVisual as ProviderType } from "@/types/provider";
 
 import { cn } from "@/lib/utils";
+import { getImgBackgroundColor } from "@/lib/getImgBackgroundColor";
 
 const zodEnumFromPrisma = <T extends Record<string, string>>(prismaEnum: T) =>
   z.enum([...Object.values(prismaEnum)] as [T[keyof T], ...T[keyof T][]]);
@@ -184,6 +185,8 @@ export function FormModal({
 
         try {
           const base64 = await convertFileToBase64(file);
+          const color = await getImgBackgroundColor(base64);
+          form.setValue("color", color);
           setLogoPreview(base64);
         } catch (error) {
           console.error("Error converting file to base64:", error);
