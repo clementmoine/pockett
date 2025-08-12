@@ -10,6 +10,7 @@ interface CreateCardRequest {
   logo?: string;
   color: string;
   type: CardType;
+  tag?: string;
   country?: Country;
   providerId?: string;
 }
@@ -20,6 +21,7 @@ interface UpdateCardRequest {
   logo?: string;
   color?: string;
   type?: CardType;
+  tag?: string;
   country?: Country;
   providerId?: string;
 }
@@ -90,6 +92,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     logo,
     color,
     type,
+    tag,
     country,
     providerId,
   }: CreateCardRequest = req.body;
@@ -132,6 +135,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       logo: logo || null,
       color,
       type,
+      tag,
       country: country || null,
       providerId: providerId || null,
     },
@@ -152,6 +156,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
     logo,
     color,
     type,
+    tag,
     country,
     providerId,
   }: UpdateCardRequest = req.body;
@@ -189,6 +194,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
       ...(logo !== undefined && { logo: logo }),
       ...(color && { color: color }),
       ...(type && { type: type }),
+      ...(tag && { tag: tag }),
       ...(country !== undefined && { country: country }),
       ...(providerId !== undefined && {
         providerId: providerId,

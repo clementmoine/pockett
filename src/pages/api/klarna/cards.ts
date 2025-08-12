@@ -45,11 +45,6 @@ export default async function cards(req: NextApiRequest, res: NextApiResponse) {
 
     await Promise.all(
       identifiers.map(async (identifier) => {
-        let name = identifier.processed.name;
-        if (identifier.processed.label) {
-          name = `${identifier.processed.name} (${identifier.processed.label.trim()})`;
-        }
-
         let logo = "";
         const logoUrl = identifier.processed.visual.logo_url;
         if (!identifier.is_custom_card && logoUrl) {
@@ -63,11 +58,12 @@ export default async function cards(req: NextApiRequest, res: NextApiResponse) {
             identifier.processed.barcode.format === "QR_CODE"
               ? "qr"
               : "barcode",
-          name: name,
+          name: identifier.processed.name,
           code: identifier.processed.barcode.content.toString(),
           logo: logo,
           color: identifier.processed.visual.color,
           country: null,
+          tag: identifier.processed.label,
         });
       }),
     );

@@ -48,6 +48,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 
 import type { Card as CardType } from "@prisma/client";
 
@@ -82,6 +83,7 @@ export function Card({
   color: cardColor,
   code,
   type,
+  tag,
   id,
   flipped: externalFlipped,
   initialFlipped = false,
@@ -177,6 +179,13 @@ export function Card({
     } catch {
       return "text-black"; // Fallback to black if the color is invalid
     }
+  }, [cardColor]);
+
+  // Calculate the tag color
+  const tagColor = useMemo(() => {
+    return color(cardColor || "#FFF").isLight()
+      ? "bg-black text-white"
+      : "bg-white text-black";
   }, [cardColor]);
 
   // Generate the code as a Base64 image URL
@@ -305,20 +314,26 @@ export function Card({
                     src={logo}
                     width={128}
                     height={128}
-                    alt="Card Logo"
+                    alt={tag ? `${name} (${tag}) logo` : `${name} logo`}
                     className="size-1/2 object-contain select-none"
                     draggable={false}
                   />
                 ) : (
-                  <span className={`text-lg font-bold ${textColor}`}>
-                    No Logo
-                  </span>
+                  <>
+                    <span className={`text-lg font-bold ${textColor}`}>
+                      No Logo
+                    </span>
+                    <span
+                      className={`text-sm text-center w-full ${textColor} line-clamp-2 px-2`}
+                    >
+                      {name.trim().length > 1 ? name : "N/A"}
+                    </span>
+                  </>
                 )}
-                <span
-                  className={`text-sm text-center w-full ${textColor} line-clamp-2 px-2`}
-                >
-                  {name.trim().length > 1 ? name : "N/A"}
-                </span>
+
+                <Badge variant="default" className={`empty:hidden ${tagColor}`}>
+                  {tag}
+                </Badge>
               </div>
 
               {/* Back Side */}
@@ -455,6 +470,7 @@ export function Card({
             color={cardColor}
             code={code}
             type={type}
+            tag={tag}
             initialFlipped={true}
           />
         </DialogContent>

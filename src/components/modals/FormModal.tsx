@@ -75,6 +75,7 @@ const cardSchema = z.object({
       }
     }, "Invalid color format"),
   type: z.enum(["auto", "qr", "barcode"]).default("auto"),
+  tag: z.string().trim().optional(),
 });
 
 type FormValues = z.infer<typeof cardSchema>;
@@ -109,6 +110,7 @@ const defaultValues: FormValues = {
   color: "",
   country: "FR",
   type: "auto",
+  tag: "",
 };
 
 export function FormModal({
@@ -145,6 +147,7 @@ export function FormModal({
         logo: card.logo || defaultValues.logo,
         color: card.color || defaultValues.color,
         type: card.type || defaultValues.type,
+        tag: card.tag || defaultValues.tag,
       });
       setLogoPreview(card.logo || null);
     } else {
@@ -215,6 +218,7 @@ export function FormModal({
       logo: logo,
       color: values.color,
       country: values.country || null,
+      tag: values.tag || null,
     };
 
     if (card && onEditCard) {
@@ -278,6 +282,7 @@ export function FormModal({
                     <Card
                       id="-1"
                       type="auto"
+                      tag={form.watch("tag") ?? null}
                       name={form.watch("name")}
                       color={form.watch("color")}
                       logo={logoPreview || null}
@@ -296,6 +301,7 @@ export function FormModal({
                     <Card
                       id="-1"
                       type="qr"
+                      tag={form.watch("tag") ?? null}
                       name={form.watch("name")}
                       color={form.watch("color")}
                       logo={logoPreview || null}
@@ -315,6 +321,7 @@ export function FormModal({
                     <Card
                       id="-1"
                       type="barcode"
+                      tag={form.watch("tag") ?? null}
                       name={form.watch("name")}
                       color={form.watch("color")}
                       logo={logoPreview || null}
@@ -383,6 +390,24 @@ export function FormModal({
                     <FormControl>
                       <Input
                         placeholder="Enter card name"
+                        className="bg-background text-foreground"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="tag"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-foreground">Tag</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., Mom, Work, Personal"
                         className="bg-background text-foreground"
                         {...field}
                       />

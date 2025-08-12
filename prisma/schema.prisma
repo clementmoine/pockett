@@ -46,6 +46,7 @@ model Card {
   color       String
   type        CardType
   country     Country?
+  tag         String?
   providerId  String?   @map("provider_id")
   provider    Provider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
   createdAt   DateTime  @default(now())
