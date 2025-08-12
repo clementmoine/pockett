@@ -2,12 +2,14 @@
 
 import { toast } from "sonner";
 import { useCallback, useMemo, useState } from "react";
+import { signOut } from "next-auth/react";
 import {
   GalleryVerticalEnd,
   Plus,
   Ellipsis,
   Download,
   Upload,
+  LogOut,
 } from "lucide-react";
 
 import {
@@ -151,6 +153,7 @@ export default function Home() {
                 <Upload />
                 Import cards
               </DropdownMenuItem>
+
               <DropdownMenuItem
                 onClick={() => {
                   setIsModalOpen("export");
@@ -159,6 +162,13 @@ export default function Home() {
               >
                 <Download />
                 Share cards
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => signOut({ callbackUrl: "/login" })}
+              >
+                <LogOut />
+                Logout
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

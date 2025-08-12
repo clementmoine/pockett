@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import ReactQueryProvider from "@/providers/ReactQueryProvider";
+import { SessionProvider } from "@/providers/SessionProvider";
 
 import "./globals.css";
 
@@ -49,17 +50,19 @@ export default function RootLayout({
     // Suppress hydration warning for the html tag due to the theme provider
     <html lang="en" dir="ltr" suppressHydrationWarning>
       <body>
-        <ReactQueryProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            {children}
-            <Toaster />
-          </ThemeProvider>
-        </ReactQueryProvider>
+        <SessionProvider>
+          <ReactQueryProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              {children}
+              <Toaster />
+            </ThemeProvider>
+          </ReactQueryProvider>
+        </SessionProvider>
       </body>
     </html>
   );

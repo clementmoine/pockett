@@ -16,10 +16,13 @@
 - 💳 Export to Apple Wallet / Google Wallet
 - 🔐 Uses [addtowallet.co](https://addtowallet.co) for wallet passes
 - 🛠 Requires an API key for wallet generation
+- 🔒 Password-protected access with NextAuth.js
 
 ---
 
 ## 🚀 Getting Started
+
+### Development
 
 ```bash
 pnpm install
@@ -32,7 +35,38 @@ Create a `.env.local` file:
 
 ```env
 ADDTOWALLET_API_KEY=your_api_key_here
+APP_PASSWORD=your-secure-password
+NEXTAUTH_SECRET=your-super-secret-key
+NEXTAUTH_URL=http://localhost:3000
 ```
+
+### Docker Deployment
+
+1. Set your environment variables:
+
+```bash
+export APP_PASSWORD="your-secure-password"
+export NEXTAUTH_SECRET="your-super-secret-key"
+```
+
+2. Build and run with Docker Compose:
+
+```bash
+docker-compose up -d
+```
+
+The app will be available at [http://localhost:3000](http://localhost:3000) and will require the password you set in `APP_PASSWORD` to access.
+
+## 🔐 Authentication
+
+Pockett now includes password protection to secure your loyalty cards:
+
+- **Simple Password Auth**: Set a single password in your environment variables
+- **Session Management**: Stay logged in for 30 days
+- **Protected Routes**: All app functionality is protected behind authentication
+- **Secure**: Uses NextAuth.js with JWT tokens
+
+To change your password, update the `APP_PASSWORD` environment variable and restart the application.
 
 ---
 
