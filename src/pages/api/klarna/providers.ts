@@ -8,7 +8,6 @@ import type { Country } from "@prisma/client";
 import type { RawProvider, ProviderWithVisual } from "@/types/provider";
 
 const prisma = new PrismaClient();
-const CACHE_TTL = 1000 * 60 * 60 * 24 * 30; // 30 days
 
 async function downloadAndConvertLogo(logoUrl: string): Promise<string | null> {
   try {
@@ -128,30 +127,6 @@ async function loadProviders(): Promise<ProviderWithVisual[]> {
   });
 }
 
-async function isCacheExpired(): Promise<boolean> {
-  try {
-    // Check if we have any providers and when they were last updated
-    const latestProvider = await prisma.provider.findFirst({
-      orderBy: {
-        updatedAt: "desc",
-      },
-      select: {
-        updatedAt: true,
-      },
-    });
-
-    if (!latestProvider) {
-      return true; // No providers in DB, need to fetch
-    }
-
-    const timeSinceUpdate = Date.now() - latestProvider.updatedAt.getTime();
-    return timeSinceUpdate >= CACHE_TTL;
-  } catch (error) {
-    console.error("Error checking cache expiration:", error);
-    return true; // On error, assume cache is expired
-  }
-}
-
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -166,18 +141,15 @@ export default async function handler(
       return res.status(400).json({ error: "Missing 'country' query param" });
     }
 
-    const ignoreCache = req.query?.ignoreCache === "true";
-    const isExpired = ignoreCache || (await isCacheExpired());
-
     let providers: ProviderWithVisual[];
 
-    if (isExpired) {
-      console.log(
-        "Cache expired or ignored, fetching fresh data from Klarna API",
-      );
+    try {
       providers = await fetchAndSaveProviders();
-    } else {
-      console.log("Loading providers from database");
+    } catch (error) {
+      console.log(
+        "Failed to fetch from Klarna API, falling back to database",
+        error,
+      );
       providers = await loadProviders();
     }
 
