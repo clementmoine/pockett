@@ -49,6 +49,13 @@ RUN if [ -f prisma/seed.ts ]; then \
       ls -la .; \
     else \
       echo "No seed.ts file found, skipping compilation."; \
+      echo "No seed.ts file found, skipping compilation."; \
+    fi
+
+# Compile repair.ts
+RUN if [ -f prisma/repair.ts ]; then \
+      echo "🔨 Compiling repair.ts to repair.js..."; \
+      npx tsc prisma/repair.ts --target ES2020 --module commonjs --skipLibCheck --moduleResolution node --esModuleInterop --outDir ./prisma/; \
     fi
 
 # Production image, copy all the files and run next
@@ -67,10 +74,12 @@ COPY --from=builder /app/.next/static ./.next/static
 
 # Copy Prisma schema and migrations
 COPY --from=builder /app/prisma/seed.js ./prisma/
+COPY --from=builder /app/prisma/repair.js ./prisma/
 COPY --from=builder /app/prisma/schema.prisma ./prisma/
 COPY --from=builder /app/prisma/migrations ./prisma/migrations
 
 # Create directory for config and Prisma
+RUN npm install -g prisma@6.7.0
 RUN mkdir -p /config /app/prisma
 
 # Copy start script

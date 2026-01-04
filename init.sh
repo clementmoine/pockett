@@ -14,8 +14,14 @@ if [ ! -f /config/dev.db ]; then
   touch /config/dev.db
   ln -sf /config/dev.db /app/prisma/dev.db
 
-  npx prisma generate
-  npx prisma migrate deploy
+  prisma generate
+  prisma migrate deploy
+
+  # Run repair to fix any corrupted JSON from crashes/miners
+  if [ -f /app/prisma/repair.js ]; then
+    echo "🔧 Running DB repair..."
+    node /app/prisma/repair.js
+  fi
 
   if [ -f /app/prisma/seed.js ]; then
     echo "🌱 Running seed..."
@@ -27,8 +33,14 @@ else
   echo "✅ DB exists, linking to /app/prisma..."
   ln -sf /config/dev.db /app/prisma/dev.db
   export DATABASE_URL="file:/app/prisma/dev.db"
-  npx prisma generate
-  npx prisma migrate deploy
+  prisma generate
+  prisma generate
+  prisma migrate deploy
+  
+  if [ -f /app/prisma/repair.js ]; then
+    echo "🔧 Running DB repair..."
+    node /app/prisma/repair.js
+  fi
 fi
 
 # Start the application
