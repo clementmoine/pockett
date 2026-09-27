@@ -90,11 +90,14 @@ const convertFileToBase64 = async (file: File): Promise<string> => {
 };
 
 const fetchLogoFromUrl = async (url: string): Promise<string | null> => {
+  // Already embedded (Klarna sync) — don't re-fetch.
+  if (url.startsWith("data:image/")) return url;
   try {
     const response = await fetch(url);
+    if (!response.ok) return null;
     const blob = await response.blob();
     return await convertFileToBase64(
-      new File([blob], "logo.png", { type: blob.type }),
+      new File([blob], "logo.png", { type: blob.type || "image/png" }),
     );
   } catch (error) {
     console.error("Error fetching logo from URL:", error);
@@ -157,10 +160,11 @@ export function FormModal({
   }, [card, reset]);
 
   const handleProviderChange = async (provider: ProviderType) => {
-    if (provider.visual?.logoUrl) {
-      const base64 = await fetchLogoFromUrl(provider.visual.logoUrl);
-      form.setValue("logo", base64);
-      setLogoPreview(base64);
+    const logoUrl = provider.visual?.logoUrl;
+    if (logoUrl) {
+      const logo = (await fetchLogoFromUrl(logoUrl)) || logoUrl;
+      form.setValue("logo", logo, { shouldValidate: true });
+      setLogoPreview(logo);
     }
 
     if (

@@ -1,7 +1,31 @@
 import { retry } from "@/lib/retry";
+import {
+  persistKlarnaRefreshToken,
+  resolveKlarnaRefreshToken,
+} from "@/lib/klarna-config";
 
+/**
+ * Klarna web (app.klarna.com / klapp SPA) — verified 2026-09 against loyalty BFF.
+ * Native Android client_id still works for tokens sniffed from the app; override via env.
+ */
+export const KLARNA_WEB_CLIENT_ID = "ca89d7d6-f74e-4c4f-9fa9-a28fd13d4074";
+
+/** @deprecated use KLARNA_CLIENT_ID — kept for env overrides from native mitm. */
+export const KLARNA_NATIVE_CLIENT_ID =
+  "68879600-266c-4805-a978-1916b25239d2";
+
+export const KLARNA_CLIENT_ID =
+  process.env.KLARNA_CLIENT_ID || KLARNA_WEB_CLIENT_ID;
+
+export const KLARNA_REDIRECT_URI =
+  process.env.KLARNA_REDIRECT_URI || "https://app.klarna.com/auth/callback";
+
+export const KLARNA_API_BASE =
+  process.env.KLARNA_API_BASE || "https://app-api.klarna.com";
+
+/** Regional web client ids (US / AP) if market ever needs them. */
 export const clientIds = {
-  EU: "ca89d7d6-f74e-4c4f-9fa9-a28fd13d4074",
+  EU: KLARNA_WEB_CLIENT_ID,
   US: "639c2886-026e-452f-b5fc-096683d95b0e",
   AP: "51119b87-8f66-4ef9-973a-60f7034d0a98",
 };
@@ -12,142 +36,166 @@ interface TokenData {
   access_token: string;
   refresh_token?: string;
   expires_in?: number;
-  expiresAt?: number; // Timestamp calculé
+  expiresAt?: number;
+}
+
+function resolveRefreshToken(): string {
+  const token = resolveKlarnaRefreshToken();
+  if (!token) {
+    throw new Error(
+      "KLARNA_REFRESH_TOKEN manquant — ouvrir Connect Klarna dans Pockett.",
+    );
+  }
+  return token;
+}
+
+export function defaultKlarnaHeaders(
+  market = "FR",
+): Record<string, string> {
+  return {
+    Accept: "application/json",
+    "User-Agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "x-klarna-app-platform": "web",
+    "x-klarna-app-locale": `${market.toLowerCase()}-${market}`,
+    "x-klarna-app-timezone": "Europe/Paris",
+    "x-klarna-client-flavor": "pink",
+    "x-klarna-client-target": "app",
+    "x-klarna-app-client": "klapp",
+    "x-klarna-market": market,
+  };
 }
 
 class KlarnaSession {
   private tokenInfo: TokenData | null = null;
   private refreshing: Promise<string> | null = null;
-  private tokenSafetyMargin = 5 * 60 * 1000; // 5 minutes
+  /** Access tokens expire in ~300s. */
+  private tokenSafetyMargin = 30 * 1000;
   private defaultRegion: Region = "EU";
 
-  // Check the token is not expired
   private isTokenExpired(): boolean {
-    if (!this.tokenInfo || !this.tokenInfo.expiresAt) return true;
+    if (!this.tokenInfo?.expiresAt) return true;
     return Date.now() > this.tokenInfo.expiresAt - this.tokenSafetyMargin;
   }
 
-  // Roken the token
   public revokeToken(): void {
     this.tokenInfo = null;
     this.refreshing = null;
   }
 
-  // Get a valid token (from cache or fetch one)
-  public async getToken(region: Region = this.defaultRegion): Promise<string> {
-    // Valid token in cache
+  public async getToken(_region: Region = this.defaultRegion): Promise<string> {
     if (this.tokenInfo && !this.isTokenExpired()) {
       return this.tokenInfo.access_token;
     }
+    if (this.refreshing) return this.refreshing;
 
-    // Wait refreshing in progress
-    if (this.refreshing) {
-      return this.refreshing;
-    }
-
-    // Start the token refresh
-    this.refreshing = this.refreshAccessToken(region);
-
+    this.refreshing = this.refreshAccessToken();
     try {
-      const token = await this.refreshing;
-      return token;
+      return await this.refreshing;
     } finally {
-      // Close the ended refresh
       this.refreshing = null;
     }
   }
 
-  // Refresh the token
-  private async refreshAccessToken(region: Region): Promise<string> {
-    const clientId = clientIds[region];
-    const refreshToken = process.env.KLARNA_REFRESH_TOKEN;
+  private async refreshAccessToken(): Promise<string> {
+    const refreshToken = resolveRefreshToken();
+    const clientId = KLARNA_CLIENT_ID;
+    const redirectUri = KLARNA_REDIRECT_URI;
 
-    if (!refreshToken) {
-      throw new Error("KLARNA_REFRESH_TOKEN was not declared in env.");
+    console.log("[klarna] refreshing access token…");
+    const response = await retry(() =>
+      fetch(`${KLARNA_API_BASE}/fr/api/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json;charset=utf-8",
+          ...defaultKlarnaHeaders(),
+        },
+        body: JSON.stringify({
+          grant_type: "refresh_token",
+          refresh_token: refreshToken,
+          client_id: clientId,
+          redirect_uri: redirectUri,
+        }),
+      }),
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      this.revokeToken();
+      throw new Error(
+        `Klarna refresh failed ${response.status}: ${text.slice(0, 200)}. ` +
+          `Si invalid_grant → reconnecte Klarna depuis le menu ⋯.`,
+      );
     }
 
+    const data = (await response.json()) as TokenData;
+    if (data.expires_in) {
+      data.expiresAt = Date.now() + data.expires_in * 1000;
+    }
+    const nextRefresh = data.refresh_token || refreshToken;
+    data.refresh_token = nextRefresh;
+
+    this.tokenInfo = data;
+    process.env.KLARNA_REFRESH_TOKEN = nextRefresh;
+    if (nextRefresh !== refreshToken) {
+      persistKlarnaRefreshToken(nextRefresh);
+      console.log("[klarna] refresh_token rotated → persisted /config");
+    }
+    console.log("[klarna] access token ok");
+    return data.access_token;
+  }
+
+  /** Warm auth at server boot — fails fast with a clear message. */
+  public async ensureReady(): Promise<{ ok: true } | { ok: false; error: string }> {
     try {
-      console.log("Refreshing Klarna access token...");
-      const response = await retry(() =>
-        fetch("https://app.klarna.com/fr/api/auth/refresh", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            grant_type: "refresh_token",
-            refresh_token: refreshToken,
-            client_id: clientId,
-            redirect_uri: "https://app.klarna.com/auth/callback",
-          }),
-        }),
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to refresh access token: ${response.statusText}`,
-        );
-      }
-
-      const data = (await response.json()) as TokenData;
-
-      // Add expiration date
-      if (data.expires_in) {
-        data.expiresAt = Date.now() + data.expires_in * 1000;
-      }
-
-      this.tokenInfo = data;
-
-      console.log("Klarna access token refreshed successfully.");
-
-      return data.access_token;
-    } catch (error) {
-      console.error("Error refreshing access token:", error);
-      this.revokeToken();
-      throw error;
+      await this.getToken();
+      return { ok: true };
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
+      return { ok: false, error };
     }
   }
 
-  // Authenticated request
   public async request<T>(
     uri: string,
     options: RequestInit = {},
     region: Region = this.defaultRegion,
+    market = "FR",
   ): Promise<T> {
-    if (!options.headers) {
-      options.headers = {};
-    }
-
-    // Get a valid token
+    const path = uri.startsWith("/") ? uri : `/${uri}`;
     const token = await this.getToken(region);
+    const headers: Record<string, string> = {
+      ...defaultKlarnaHeaders(market),
+      ...(options.headers as Record<string, string> | undefined),
+      Authorization: `Bearer ${token}`,
+    };
 
-    // Add Authorization headers
-    (options.headers as Record<string, string>)["Authorization"] =
-      `Bearer ${token}`;
-
-    // Request with retry
     return retry(async () => {
-      const response = await fetch(`https://app.klarna.com/${uri}`, options);
+      const response = await fetch(`${KLARNA_API_BASE}${path}`, {
+        ...options,
+        headers,
+      });
 
       if (!response.ok) {
-        // Revoke the token if not valid anymore
         if (response.status === 401 || response.status === 403) {
           this.revokeToken();
         }
+        const text = await response.text();
         throw new Error(
-          `Klarna API error: ${response.status} ${response.statusText}`,
+          `Klarna API ${response.status} ${path}: ${text.slice(0, 200)}`,
         );
       }
 
+      if (response.status === 204) {
+        return undefined as T;
+      }
       return (await response.json()) as T;
     });
   }
 
-  // Change the region (EU, US, AP)
   public setDefaultRegion(region: Region): void {
     this.defaultRegion = region;
   }
 }
 
-// Singleton
 export const klarnaSession = new KlarnaSession();

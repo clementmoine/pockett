@@ -315,6 +315,7 @@ export function Card({
                     width={128}
                     height={128}
                     alt={tag ? `${name} (${tag}) logo` : `${name} logo`}
+                    unoptimized
                     className="size-1/2 object-contain select-none"
                     draggable={false}
                   />

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pockett Connector</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0e0e0f;
+        --fg: #f5f5f5;
+        --muted: #a1a1aa;
+        --pink: #ffa8cd;
+        --border: #27272a;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #fafafa;
+          --fg: #0e0e0f;
+          --muted: #71717a;
+          --border: #e4e4e7;
+        }
+      }
+      body {
+        margin: 0;
+        font: 13px/1.45 system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        min-width: 300px;
+        max-width: 340px;
+      }
+      main {
+        padding: 14px 16px 16px;
+        display: grid;
+        gap: 12px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 650;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      label {
+        display: grid;
+        gap: 4px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      input {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 10px;
+        background: transparent;
+        color: var(--fg);
+        font: inherit;
+      }
+      button {
+        border: 0;
+        border-radius: 8px;
+        padding: 9px 12px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        background: var(--pink);
+        color: #0e0e0f;
+      }
+      button.secondary {
+        background: transparent;
+        color: var(--fg);
+        border: 1px solid var(--border);
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+      .row button {
+        flex: 1;
+      }
+      .status {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+      .ok {
+        color: #16a34a;
+      }
+      .bad {
+        color: #dc2626;
+      }
+      ul {
+        margin: 0;
+        padding-left: 1.1rem;
+        color: var(--muted);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div>
+        <h1>Pockett Connector</h1>
+        <p>Envoie les credentials web vers ton instance Pockett.</p>
+      </div>
+
+      <label>
+        URL Pockett
+        <input id="origin" type="url" placeholder="http://localhost:3000" />
+      </label>
+
+      <div class="row">
+        <button id="save" type="button">Enregistrer</button>
+        <button id="open" class="secondary" type="button">Ouvrir</button>
+      </div>
+
+      <button id="scan" class="secondary" type="button">
+        Scanner Klarna maintenant
+      </button>
+
+      <div class="status" id="status">…</div>
+
+      <div>
+        <p style="font-weight: 600; color: var(--fg); margin-bottom: 4px">
+          Providers
+        </p>
+        <ul>
+          <li>Klarna — <code>app.klarna.com</code></li>
+          <li style="opacity: 0.7">Autres — à venir (registry)</li>
+        </ul>
+      </div>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

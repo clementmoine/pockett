@@ -24,6 +24,11 @@ const nextConfig = {
         hostname: "flagcdn.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "x.klarnacdn.net",
+        pathname: "/**",
+      },
     ],
   },
 };

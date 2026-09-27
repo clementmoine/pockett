@@ -132,10 +132,11 @@ export function ProviderPicker({
       >
         {provider.visual?.logoUrl && (
           <Image
-            src={provider.visual?.logoUrl}
+            src={provider.visual.logoUrl}
             alt={provider.name}
             width={32}
             height={32}
+            unoptimized
             className="w-full h-full object-contain"
           />
         )}

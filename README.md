@@ -31,6 +31,11 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser to view the app.
 
+### Klarna providers (catalogue fidélité)
+
+API authentifiée. En Docker : `KLARNA_REFRESH_TOKEN` en env (ou ⋯ → Comptes liés).
+Détail : [`docs/klarna.md`](docs/klarna.md).
+
 Create a `.env.local` file:
 
 ```env

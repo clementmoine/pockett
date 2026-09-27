@@ -3,12 +3,12 @@
 import { z } from "zod";
 import { toast } from "sonner";
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { KlarnaButton } from "@/components/KlarnaButton";
 import {
   Form,
   FormField,
@@ -25,9 +25,6 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-
-import Klarna from "@/images/klarna.svg";
-import Image from "next/image";
 
 import type { Card } from "@prisma/client";
 
@@ -150,21 +147,13 @@ export function ImportModal({
             </div>
 
             <DialogFooter className="p-4 border-t shrink-0">
-              <Button
-                type="button"
-                variant="secondary"
+              <KlarnaButton
                 onClick={importFromKlarna}
-                style={{
-                  backgroundColor: "#ffa8cd",
-                  color: "#0E0E0F",
-                }}
+                loading={loading}
                 className="sm:mr-auto"
-                disabled={loading}
               >
-                {loading && <Loader2 className=" animate-spin" />}
                 Import from
-                <Image src={Klarna} alt="Klarna" className="h-3 w-fit" />
-              </Button>
+              </KlarnaButton>
               <Button type="button" onClick={handleClose} variant="secondary">
                 Cancel
               </Button>

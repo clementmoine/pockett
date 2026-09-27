@@ -46,6 +46,20 @@ certificates
 # Serwist
 public/sw*
 public/swe-worker*
+# Klarna tokens (do not commit)
+.klarna-tokens.json
 prisma/providers.json
-prisma/dev.db
+prisma/provider-names.txt
+prisma/top-providers.json
+klarna-refresh-token
+**/klarna-refresh-token
+klarna-bridge-pending.json
+**/klarna-bridge-pending.json
+
+# Local data (loyalty codes / sqlite)
 cards.json
+prisma/*.db
+prisma/*.db-journal
+*.db
+
+extensions/pockett-connector/.key.pub.b64
