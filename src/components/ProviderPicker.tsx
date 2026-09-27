@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   Popover,
@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 
 import type { ProviderWithVisual } from "@/types/provider";
 
+import { isCustomProviderId } from "@/lib/custom-provider-ids";
 import { cn } from "@/lib/utils";
 
 export function ProviderPicker({
@@ -74,7 +75,12 @@ export function ProviderPicker({
     return { startsWith, includes, distance };
   }
 
-  const { data: providers = [], isLoading: loading } = useQuery({
+  const {
+    data: providers = [],
+    isLoading: loading,
+    isFetching,
+    refetch,
+  } = useQuery({
     queryKey: ["providers", countryCode],
     queryFn: async () => {
       const res = await fetch(`/api/klarna/providers?country=${countryCode}`);
@@ -95,10 +101,24 @@ export function ProviderPicker({
     },
   });
 
+  useEffect(() => {
+    if (open) void refetch();
+  }, [open, refetch]);
+
+  const customProviders = useMemo(
+    () => providers.filter((provider) => isCustomProviderId(provider.id)),
+    [providers],
+  );
+  const catalogProviders = useMemo(
+    () => providers.filter((provider) => !isCustomProviderId(provider.id)),
+    [providers],
+  );
+
   const suggestedProviders = useMemo<ProviderWithVisual[]>(() => {
     if (!suggestFrom || value) return [];
 
     return providers
+      .filter((provider) => !isCustomProviderId(provider.id))
       .map((provider) => {
         const { startsWith, includes, distance } = getProviderScore(
           provider,
@@ -191,7 +211,7 @@ export function ProviderPicker({
           })}
         >
           <span className="flex items-center gap-2 shrink-0 flex-1 overflow-hidden">
-            {loading && <Loader2 className=" animate-spin" />}
+            {(loading || isFetching) && <Loader2 className=" animate-spin" />}
             {currentProvider && renderProviderCard(currentProvider)}
 
             <span className="text-ellipsis overflow-hidden">
@@ -230,9 +250,15 @@ export function ProviderPicker({
               </CommandGroup>
             )}
 
-            {providers.length > 0 && (
-              <CommandGroup heading={`Providers (${providers.length})`}>
-                {providers.map(renderProvider)}
+            {customProviders.length > 0 && (
+              <CommandGroup heading="Comptes">
+                {customProviders.map(renderProvider)}
+              </CommandGroup>
+            )}
+
+            {catalogProviders.length > 0 && (
+              <CommandGroup heading={`Providers (${catalogProviders.length})`}>
+                {catalogProviders.map(renderProvider)}
               </CommandGroup>
             )}
           </CommandList>

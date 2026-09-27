@@ -32,12 +32,15 @@ type FormValues = z.infer<typeof shelfSchema>;
 
 export function Cards({
   cards = [],
+  enhancedProviderIds = [],
   onDeleteCard,
   onEditCard,
   onAddToWallet,
   onShareCard,
 }: {
   cards: CardType[];
+  /** Catalog providers with a linked-account upgrade currently on. */
+  enhancedProviderIds?: readonly string[];
   onDeleteCard: (id: CardType["id"]) => void;
   onEditCard: (card: CardType) => void;
   onAddToWallet: (id: CardType["id"]) => void;
@@ -141,6 +144,10 @@ export function Cards({
           <Card
             key={`${card.id}-${index}`}
             {...card}
+            enhanceOnShow={
+              card.providerId != null &&
+              enhancedProviderIds.includes(card.providerId)
+            }
             onDeleteCard={onDeleteCard}
             onEditCard={() => onEditCard(card)}
             onAddToWallet={() => onAddToWallet(card.id)}

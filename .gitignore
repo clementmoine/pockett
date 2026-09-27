@@ -57,6 +57,8 @@ klarna-bridge-pending.json
 **/klarna-bridge-pending.json
 grand-frais-session.json
 **/grand-frais-session.json
+lidl-account
+**/lidl-account
 
 # Local data (loyalty codes / sqlite)
 cards.json

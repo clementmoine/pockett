@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Pockett Connector",
   "description": "Capture securely credentials from web apps (Klarna today — more providers later) and send them to your Pockett instance.",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAibFaXWByqCcLLTzEjSlFitSSnlgufDCeEHFBAY7McpYW70bO34+O7dQz6DWINb8zncpt+zNh5b/zbCnJw8y/9yoHrLhaDDF8pysHOFI9fxf2eINvk7oUPAz6CItPiP0AMn3iqNjl8VUvkdrNxmlTGMokpvMix602k5WQrPXXjvy7pLLVhe/nn1oxeJzSdCPVcj0ZMiv+LzxQPA+eQHsFHZe138p/zfLfxYo0mTdX44HRY1ExhTc+LK9+eAeXgws8D9sJ8iAO6A5rCh737EusxoAADfCaltlx/D0Hc2oNTMAdOF2uwWgrO5qCO8i3A7ITwsxUDY+QR6N12K2i7axRHwIDAQAB",
   "action": {
     "default_title": "Pockett Connector",
@@ -21,7 +21,7 @@
   "background": {
     "service_worker": "background.js"
   },
-  "permissions": ["storage", "tabs", "scripting", "alarms"],
+  "permissions": ["storage", "tabs", "scripting", "alarms", "webRequest", "webNavigation"],
   "host_permissions": [
     "https://app.klarna.com/*",
     "http://*/*",

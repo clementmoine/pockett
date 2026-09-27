@@ -296,23 +296,13 @@ export function KlarnaConnection({ active }: { active: boolean }) {
       )}
 
       {linked ? (
-        <>
-          <KlarnaButton
-            variant="unlink"
-            className="w-full"
-            loading={busy}
-            disabled={busy}
-            onClick={() => void unlink()}
-          />
-          <button
-            type="button"
-            className="w-full text-center text-xs text-muted-foreground underline-offset-2 hover:underline"
-            disabled={starting}
-            onClick={() => void connect()}
-          >
-            Relier un autre compte
-          </button>
-        </>
+        <KlarnaButton
+          variant="unlink"
+          className="w-full"
+          loading={busy}
+          disabled={busy}
+          onClick={() => void unlink()}
+        />
       ) : (
         <>
           {!extReady && (

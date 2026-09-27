@@ -17,12 +17,27 @@
       {
         source: "pockett-connector",
         type: "ready",
-        version: "0.1.0",
+        version: "0.1.4",
         extensionId: chrome.runtime.id,
       },
       "*",
     );
   }
+
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type !== "pockett.authCode") return;
+    window.postMessage(
+      {
+        source: "pockett-connector",
+        type: "auth-code",
+        providerId: message.providerId,
+        connectionId: message.connectionId,
+        nonce: message.nonce,
+        code: message.code,
+      },
+      "*",
+    );
+  });
 
   function start() {
     if (started || !isPockettApp()) return;
@@ -32,23 +47,27 @@
     setTimeout(announce, 300);
     setTimeout(announce, 1000);
 
-    chrome.runtime.sendMessage({
-      type: "pockett.pair",
-      origin: location.origin,
-    }).catch(() => {});
+    chrome.runtime
+      .sendMessage({
+        type: "pockett.pair",
+        origin: location.origin,
+      })
+      .catch(() => {});
 
     window.addEventListener("message", (event) => {
       if (event.source !== window) return;
       const data = event.data;
       if (!data || data.source !== "pockett-app") return;
 
-      if (data.type === "start-capture") {
+      if (data.type === "pockett.startCapture" || data.type === "start-capture") {
         chrome.runtime
           .sendMessage({
             type: "pockett.startCapture",
             providerId: data.providerId || "klarna",
             nonce: data.nonce,
             loginUrl: data.loginUrl,
+            redirectPrefix: data.redirectPrefix,
+            connectionId: data.connectionId,
           })
           .catch(() => {});
       }
@@ -58,7 +77,7 @@
           {
             source: "pockett-connector",
             type: "pong",
-            version: "0.1.2",
+            version: "0.1.4",
             extensionId: chrome.runtime.id,
           },
           "*",
@@ -80,6 +99,5 @@
     attributes: true,
     attributeFilter: ["data-pockett-app"],
   });
-  // Safety: stop watching after a while if this isn't a Pockett page.
   setTimeout(() => observer.disconnect(), 60_000);
 })();

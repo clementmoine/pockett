@@ -227,11 +227,23 @@ async function handleMessage(message) {
     const nonce = message.nonce;
     if (!nonce) return { ok: false, error: "missing nonce" };
     lastAttemptKey = null;
-    await setCapture({ providerId, nonce });
 
     const loginUrl =
       message.loginUrl ||
       `https://app.klarna.com/login#pockett=${encodeURIComponent(nonce)}`;
+
+    if (message.redirectPrefix) {
+      await setCapture({
+        providerId,
+        nonce,
+        redirectPrefix: String(message.redirectPrefix),
+        connectionId: String(message.connectionId || providerId),
+      });
+      await chrome.tabs.create({ url: loginUrl, active: true });
+      return { ok: true, mode: "redirect" };
+    }
+
+    await setCapture({ providerId, nonce });
 
     // Prefer an existing Klarna tab (single-tab app); else open one.
     const existing = await chrome.tabs.query({
@@ -277,6 +289,86 @@ function bind(listener) {
 
 bind(chrome.runtime.onMessage);
 bind(chrome.runtime.onMessageExternal);
+
+function codeFromCallback(url) {
+  if (!url) return null;
+  try {
+    return new URL(url).searchParams.get("code");
+  } catch {
+    const match = String(url).match(/[?&]code=([^&]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+}
+
+async function deliverAuthCode(capture, code) {
+  const attemptKey = code.slice(0, 24) + capture.nonce;
+  if (attemptKey === lastAttemptKey) return;
+  lastAttemptKey = attemptKey;
+
+  const origin = await getOrigin();
+  const tabs = await chrome.tabs.query({ url: origin + "/*" });
+  for (const tab of tabs) {
+    if (!tab.id) continue;
+    chrome.tabs
+      .sendMessage(tab.id, {
+        type: "pockett.authCode",
+        providerId: capture.providerId,
+        connectionId: capture.connectionId || capture.providerId,
+        nonce: capture.nonce,
+        code,
+      })
+      .catch(() => {});
+  }
+
+  try {
+    const res = await fetch(origin + "/api/connections/bridge", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "complete",
+        connectionId: capture.connectionId || capture.providerId,
+        nonce: capture.nonce,
+        code,
+      }),
+    });
+    if (res.ok) await clearCapture();
+  } catch (e) {
+    console.warn("[pockett-connector] extension complete", e);
+  }
+
+  if (tabs[0]?.id) {
+    await chrome.tabs.update(tabs[0].id, { active: true });
+  }
+}
+
+function maybeCaptureRedirect(url) {
+  if (!url || !url.includes("://callback")) return;
+  void (async () => {
+    const capture = await getCapture();
+    if (!capture?.redirectPrefix) return;
+    if (!url.startsWith(capture.redirectPrefix)) return;
+    const code = codeFromCallback(url);
+    if (!code) return;
+    await deliverAuthCode(capture, code);
+  })();
+}
+
+chrome.webRequest.onBeforeRedirect.addListener(
+  (details) => {
+    maybeCaptureRedirect(details.redirectUrl);
+  },
+  { urls: ["https://*/*"] },
+);
+
+chrome.webNavigation.onBeforeNavigate.addListener((details) => {
+  if (details.frameId !== 0) return;
+  maybeCaptureRedirect(details.url);
+});
+
+chrome.tabs.onUpdated.addListener((_tabId, info) => {
+  if (info.url) maybeCaptureRedirect(info.url);
+});
 
 // Resume scanning after SW wake if a capture is still pending.
 void getCapture().then((c) => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { toast } from "sonner";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import {
   GalleryVerticalEnd,
@@ -38,6 +38,7 @@ export default function Home() {
   >();
   const [editingCard, setEditingCard] = useState<Card | undefined>(undefined);
   const [exportCards, setExportCards] = useState<Card[] | undefined>(undefined);
+  const [enhancedProviderIds, setEnhancedProviderIds] = useState<string[]>([]);
 
   const { cards, getCard, addNewCard, deleteCard, patchCard } = useCards();
 
@@ -77,6 +78,21 @@ export default function Home() {
       cancelled = true;
     };
   }, []);
+
+  const refreshEnhancements = useCallback(async () => {
+    try {
+      const res = await fetch("/api/connections");
+      if (!res.ok) return;
+      const data = (await res.json()) as { providerIds?: string[] };
+      setEnhancedProviderIds(data.providerIds ?? []);
+    } catch {
+      /* cards stay static QR */
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshEnhancements();
+  }, [refreshEnhancements]);
 
   const isApple = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -162,11 +178,15 @@ export default function Home() {
     [getCard],
   );
 
+  const modalKind = useRef(isModalOpen);
+  modalKind.current = isModalOpen;
+
   const handleModalClose = useCallback(() => {
+    if (modalKind.current === "connections") void refreshEnhancements();
     setEditingCard(undefined);
     setIsModalOpen(undefined);
     setExportCards(undefined);
-  }, []);
+  }, [refreshEnhancements]);
 
   const handleEditCard = useCallback((card: Card) => {
     setEditingCard(card);
@@ -259,6 +279,7 @@ export default function Home() {
 
       <Cards
         cards={cards}
+        enhancedProviderIds={enhancedProviderIds}
         onDeleteCard={deleteCard}
         onEditCard={handleEditCard}
         onAddToWallet={addToWallet}

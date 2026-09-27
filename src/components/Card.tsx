@@ -71,6 +71,15 @@ export interface CardProps
   onFlip?: (flipped: boolean) => void;
   /** When true (fullscreen embed), never open another fullscreen dialog. */
   suppressFullscreen?: boolean;
+  /**
+   * Linked account upgrades this catalog card when it is flipped or opened
+   * fullscreen. Does not replace the displayed code.
+   */
+  enhanceOnShow?: boolean;
+  /** Note already loaded by a parent card (fullscreen embed). */
+  enhanceNote?: string | null;
+  /** Parent is still activating coupons (fullscreen embed). */
+  enhancePending?: boolean;
 }
 
 /** Payload to encode: QR keeps raw text; barcodes stay alphanumeric-safe. */
@@ -115,6 +124,9 @@ export function Card({
   providerId,
   flipped: externalFlipped,
   initialFlipped = false,
+  enhanceOnShow = false,
+  enhanceNote: enhanceNoteFromParent = null,
+  enhancePending: enhancePendingFromParent = false,
   onDeleteCard,
   onEditCard,
   onAddToWallet,
@@ -164,6 +176,40 @@ export function Card({
   const [codeDataUrl, setCodeDataUrl] = useState<string | null>(null);
 
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [enhanceNote, setEnhanceNote] = useState<string | null>(null);
+  const [enhanceState, setEnhanceState] = useState<"idle" | "loading" | "done">(
+    "idle",
+  );
+  const shown = isFlipped || isFullScreenDialogOpen;
+  const couponNote = enhanceNoteFromParent || enhanceNote;
+  const couponPending =
+    enhancePendingFromParent ||
+    (enhanceOnShow && shown && !couponNote && enhanceState !== "done");
+
+  // Coupons (and any other linked-account upgrade) run only once the code
+  // side is on screen: flip or fullscreen. The front face stays a plain card.
+  useEffect(() => {
+    if (!enhanceOnShow || !id || id === "-1" || !shown) return;
+    let cancelled = false;
+    setEnhanceState("loading");
+    void fetch(`/api/cards/${encodeURIComponent(id)}/enhance`, {
+      method: "POST",
+    })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return (await res.json()) as { note?: string };
+      })
+      .then((data) => {
+        if (!cancelled && data?.note) setEnhanceNote(data.note);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setEnhanceState("done");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enhanceOnShow, id, shown]);
 
   // Dynamic codes: local regen and/or remote fetch while the card is shown
   useEffect(() => {
@@ -455,11 +501,27 @@ export function Card({
                   backgroundColor: cardColor || "#FFF",
                 }}
               >
-                <p
-                  className={`text-sm text-center w-full whitespace-nowrap text-ellipsis overflow-hidden px-8 ${textColor}`}
-                >
-                  {name.trim().length > 1 ? name : "N/A"}
-                </p>
+                <div className="flex w-full flex-col items-center">
+                  <p
+                    className={`text-sm text-center w-full whitespace-nowrap text-ellipsis overflow-hidden px-8 ${textColor}`}
+                  >
+                    {name.trim().length > 1 ? name : "N/A"}
+                  </p>
+                  {couponNote ? (
+                    <p
+                      className={`text-[11px] leading-tight text-center ${textColor}`}
+                    >
+                      {couponNote}
+                    </p>
+                  ) : couponPending ? (
+                    <p
+                      className={`flex items-center justify-center gap-1 text-[11px] leading-tight ${textColor}`}
+                    >
+                      <Loader2 className="size-3 shrink-0 animate-spin" />
+                      Activation des coupons
+                    </p>
+                  ) : null}
+                </div>
 
                 {actions && (
                   <DropdownMenu modal={false}>
@@ -612,6 +674,8 @@ export function Card({
               providerId={providerId}
               initialFlipped={true}
               suppressFullscreen
+              enhanceNote={couponNote}
+              enhancePending={couponPending}
             />
           </DialogContent>
         </Dialog>
