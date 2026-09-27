@@ -55,6 +55,8 @@ klarna-refresh-token
 **/klarna-refresh-token
 klarna-bridge-pending.json
 **/klarna-bridge-pending.json
+grand-frais-session.json
+**/grand-frais-session.json
 
 # Local data (loyalty codes / sqlite)
 cards.json

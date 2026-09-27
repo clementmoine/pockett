@@ -36,6 +36,10 @@ import type { ProviderWithVisual as ProviderType } from "@/types/provider";
 
 import { cn } from "@/lib/utils";
 import { getImgBackgroundColor } from "@/lib/getImgBackgroundColor";
+import {
+  getProviderCodeHandler,
+  providerNeedsBootstrap,
+} from "@/lib/provider-code";
 
 const zodEnumFromPrisma = <T extends Record<string, string>>(prismaEnum: T) =>
   z.enum([...Object.values(prismaEnum)] as [T[keyof T], ...T[keyof T][]]);
@@ -48,11 +52,10 @@ const cardSchema = z.object({
     .trim()
     .min(1, "Name is required")
     .refine((value) => value.trim().length > 0, "Name cannot be empty spaces"),
-  code: z
-    .string()
-    .trim()
-    .min(1, "Code is required")
-    .refine((value) => value.trim().length > 0, "Code cannot be empty spaces"),
+  /** Filled manually or by provider bootstrap — validated in submit. */
+  code: z.string().trim().optional().default(""),
+  email: z.string().trim().optional().default(""),
+  password: z.string().optional().default(""),
   logo: z
     .any()
     .refine(
@@ -109,6 +112,8 @@ const defaultValues: FormValues = {
   providerId: "",
   name: "",
   code: "",
+  email: "",
+  password: "",
   logo: null,
   color: "",
   country: "FR",
@@ -132,6 +137,7 @@ export function FormModal({
   const [logoPreview, setLogoPreview] = useState<string | null>(
     card?.logo || null,
   );
+  const [bootstrapping, setBootstrapping] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(cardSchema),
@@ -142,11 +148,17 @@ export function FormModal({
 
   useEffect(() => {
     if (card) {
+      const handler = getProviderCodeHandler(card.providerId);
       reset({
         country: card.country || defaultValues.country,
         providerId: card.providerId || defaultValues.providerId,
         name: card.name || defaultValues.name,
-        code: card.code || defaultValues.code,
+        code:
+          handler?.displayCode?.(card.code) ??
+          card.code ??
+          defaultValues.code,
+        email: "",
+        password: "",
         logo: card.logo || defaultValues.logo,
         color: card.color || defaultValues.color,
         type: card.type || defaultValues.type,
@@ -181,6 +193,20 @@ export function FormModal({
     );
   };
 
+  const providerId = form.watch("providerId");
+  const codeHandler = getProviderCodeHandler(providerId);
+  const needsBootstrap = providerNeedsBootstrap(providerId, card?.code);
+  const watchedCode = form.watch("code") || "";
+  const previewCode = (() => {
+    if (!codeHandler?.liveCode) return watchedCode;
+    const normalized = codeHandler.normalizeStoredCode?.(watchedCode, {
+      previousCode: card?.code,
+    });
+    const stored =
+      normalized && "code" in normalized ? normalized.code : watchedCode;
+    return codeHandler.liveCode(stored) || watchedCode;
+  })();
+
   const handleLogoChange = async (file: File | string | null) => {
     if (file != null) {
       if (file instanceof File) {
@@ -213,12 +239,81 @@ export function FormModal({
       logo = await convertFileToBase64(values.logo);
     }
 
+    const handler = getProviderCodeHandler(values.providerId);
+    const bootstrap = providerNeedsBootstrap(values.providerId, card?.code);
+    let storedCode = (values.code || "").trim();
+
+    if (bootstrap && handler?.bootstrap) {
+      for (const field of handler.bootstrap.fields) {
+        const raw = values[field.name as keyof FormValues];
+        if (raw == null || String(raw).trim() === "") {
+          toast.error(`${field.label} requis`);
+          form.setError(field.name as keyof FormValues, {
+            message: `${field.label} requis`,
+          });
+          return;
+        }
+      }
+      setBootstrapping(true);
+      try {
+        const body: Record<string, string> = {
+          providerId: values.providerId || "",
+        };
+        for (const field of handler.bootstrap.fields) {
+          body[field.name] = String(
+            values[field.name as keyof FormValues] ?? "",
+          );
+        }
+        const res = await fetch("/api/providers/bootstrap", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = (await res.json()) as {
+          code?: string;
+          error?: string;
+          memberId?: string;
+        };
+        if (!res.ok || !data.code) {
+          toast.error(data.error || "Connexion impossible");
+          return;
+        }
+        storedCode = data.code;
+        if (data.memberId) {
+          form.setValue("code", data.memberId);
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error("Connexion impossible");
+        return;
+      } finally {
+        setBootstrapping(false);
+      }
+    } else {
+      if (!storedCode) {
+        toast.error("Code is required");
+        form.setError("code", { message: "Code is required" });
+        return;
+      }
+      if (handler?.normalizeStoredCode) {
+        const normalized = handler.normalizeStoredCode(storedCode, {
+          previousCode: card?.code,
+        });
+        if ("error" in normalized) {
+          toast.error(normalized.error);
+          form.setError("code", { message: normalized.error });
+          return;
+        }
+        storedCode = normalized.code;
+      }
+    }
+
     const updatedCard: Omit<CardType, "createdAt" | "updatedAt"> = {
       providerId: values.providerId || null,
       type: values.type,
       id: card ? card.id : "-1",
       name: values.name,
-      code: values.code,
+      code: storedCode,
       logo: logo,
       color: values.color,
       country: values.country || null,
@@ -226,11 +321,9 @@ export function FormModal({
     };
 
     if (card && onEditCard) {
-      // Editing an existing card
       await onEditCard(updatedCard);
       toast.success(`${card.name} card updated successfully`);
     } else {
-      // Adding a new card
       await onAddCard(updatedCard);
       toast.success(`${updatedCard.name} card added successfully`);
     }
@@ -240,6 +333,7 @@ export function FormModal({
 
   const handleClose = () => {
     setLogoPreview(null);
+    setBootstrapping(false);
     reset();
     onClose();
     setIsFlipped(false);
@@ -290,7 +384,8 @@ export function FormModal({
                       name={form.watch("name")}
                       color={form.watch("color")}
                       logo={logoPreview || null}
-                      code={form.watch("code")}
+                      code={previewCode}
+                      providerId={form.watch("providerId") || null}
                       flipped={isFlipped}
                       onFlip={setIsFlipped}
                     />
@@ -309,7 +404,8 @@ export function FormModal({
                       name={form.watch("name")}
                       color={form.watch("color")}
                       logo={logoPreview || null}
-                      code={form.watch("code")}
+                      code={previewCode}
+                      providerId={form.watch("providerId") || null}
                       flipped={isFlipped}
                       onFlip={setIsFlipped}
                     />
@@ -329,7 +425,8 @@ export function FormModal({
                       name={form.watch("name")}
                       color={form.watch("color")}
                       logo={logoPreview || null}
-                      code={form.watch("code")}
+                      code={previewCode}
+                      providerId={form.watch("providerId") || null}
                       flipped={isFlipped}
                       onFlip={setIsFlipped}
                     />
@@ -462,23 +559,61 @@ export function FormModal({
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="code"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-foreground">Code</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter card code"
-                        className="bg-background text-foreground"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {needsBootstrap && codeHandler?.bootstrap ? (
+                <>
+                  {card ? (
+                    <p className="text-muted-foreground text-xs">
+                      Reconnecte ton compte pour rafraîchir le QR.
+                    </p>
+                  ) : null}
+                  {codeHandler.bootstrap.fields.map((bf) => (
+                    <FormField
+                      key={bf.name}
+                      control={form.control}
+                      name={bf.name as keyof FormValues}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-foreground">
+                            {bf.label}
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type={bf.type}
+                              placeholder={bf.placeholder}
+                              autoComplete={bf.autoComplete}
+                              className="bg-background text-foreground"
+                              value={String(field.value ?? "")}
+                              onChange={field.onChange}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                              ref={field.ref}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ))}
+                </>
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-foreground">Code</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter card code"
+                          className="bg-background text-foreground"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
 
             <DialogFooter className="p-4 border-t shrink-0">
@@ -486,8 +621,12 @@ export function FormModal({
                 Cancel
               </Button>
 
-              <Button variant="default">
-                {card ? "Save Changes" : "Add Card"}
+              <Button variant="default" disabled={bootstrapping}>
+                {bootstrapping
+                  ? "Connexion…"
+                  : card
+                    ? "Save Changes"
+                    : "Add Card"}
               </Button>
             </DialogFooter>
           </form>

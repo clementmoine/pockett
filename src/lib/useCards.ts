@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { Card, Prisma } from "@prisma/client";
 
 const CARDS_QUERY_KEY = ["cards"];
@@ -53,6 +53,14 @@ export function useCards() {
     queryKey: CARDS_QUERY_KEY,
     queryFn: cardsApi.getAll,
   });
+
+  useEffect(() => {
+    const onChange = () => {
+      void refetch();
+    };
+    window.addEventListener("pockett:cards-changed", onChange);
+    return () => window.removeEventListener("pockett:cards-changed", onChange);
+  }, [refetch]);
 
   const addCardMutation = useMutation({
     mutationFn: cardsApi.create,

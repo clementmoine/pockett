@@ -12,6 +12,7 @@ import {
   PenSquare,
   Trash2,
   Ellipsis,
+  Loader2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import color from "color";
@@ -53,9 +54,14 @@ import { Badge } from "@/components/ui/badge";
 import type { Card as CardType } from "@prisma/client";
 
 import { cn } from "@/lib/utils";
+import {
+  getProviderCodeHandler,
+  providerHasDynamicCode,
+} from "@/lib/provider-code";
 
 export interface CardProps
   extends Omit<CardType, "updatedAt" | "createdAt" | "country" | "providerId"> {
+  providerId?: string | null;
   onDeleteCard?: (id: CardType["id"]) => void;
   onEditCard?: () => void;
   onAddToWallet?: (id: CardType["id"]) => void;
@@ -63,6 +69,27 @@ export interface CardProps
   flipped?: boolean;
   initialFlipped?: boolean;
   onFlip?: (flipped: boolean) => void;
+  /** When true (fullscreen embed), never open another fullscreen dialog. */
+  suppressFullscreen?: boolean;
+}
+
+/** Payload to encode: QR keeps raw text; barcodes stay alphanumeric-safe. */
+function payloadForEncode(
+  raw: string,
+  cardType: CardType["type"],
+): { value: string; asQr: boolean } {
+  const trimmed = (raw || "").trim();
+  if (!trimmed) return { value: "", asQr: false };
+
+  const looksRich = /[^a-zA-Z0-9]/.test(trimmed);
+  const asQr =
+    cardType === "qr" ||
+    (cardType === "auto" && (looksRich || trimmed.length > 26));
+
+  if (asQr) return { value: trimmed, asQr: true };
+
+  const alphanumeric = trimmed.replace(/[^a-zA-Z0-9]/g, "");
+  return { value: alphanumeric, asQr: false };
 }
 
 type Action = {
@@ -85,6 +112,7 @@ export function Card({
   type,
   tag,
   id,
+  providerId,
   flipped: externalFlipped,
   initialFlipped = false,
   onDeleteCard,
@@ -92,8 +120,29 @@ export function Card({
   onAddToWallet,
   onShareCard,
   onFlip,
+  suppressFullscreen = false,
 }: CardProps) {
   const [isFlipped, setIsFlipped] = useState(initialFlipped);
+  const [liveCode, setLiveCode] = useState(() => {
+    const handler = getProviderCodeHandler(providerId);
+    if (handler?.remoteCode) {
+      return handler.readyPayload?.(code) || "";
+    }
+    return handler?.liveCode?.(code) || code;
+  });
+  const [remoteLoading, setRemoteLoading] = useState(false);
+
+  useEffect(() => {
+    const handler = getProviderCodeHandler(providerId);
+    if (handler?.remoteCode) {
+      // Never encode the member id / session as a placeholder QR
+      const ready = handler.readyPayload?.(code) || "";
+      setLiveCode(ready);
+      return;
+    }
+    const live = handler?.liveCode?.(code);
+    setLiveCode(live || code);
+  }, [code, providerId]);
 
   useEffect(() => {
     if (externalFlipped !== undefined) {
@@ -116,8 +165,63 @@ export function Card({
 
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
+  // Dynamic codes: local regen and/or remote fetch while the card is shown
+  useEffect(() => {
+    if (!providerHasDynamicCode(providerId)) return;
+    if (!isFlipped && !isFullScreenDialogOpen) return;
+
+    const handler = getProviderCodeHandler(providerId);
+
+    if (handler?.liveCode) {
+      const tick = () => {
+        const fresh = handler.liveCode?.(code);
+        if (fresh) setLiveCode(fresh);
+      };
+      tick();
+      const interval = window.setInterval(tick, 15_000);
+      return () => window.clearInterval(interval);
+    }
+
+    if (!handler?.remoteCode || !id || id === "-1") return;
+
+    let cancelled = false;
+    const tick = async (isInitial: boolean) => {
+      if (!navigator.onLine) {
+        if (isInitial) setRemoteLoading(false);
+        return;
+      }
+      if (isInitial && !handler.readyPayload?.(code)) {
+        setRemoteLoading(true);
+      }
+      try {
+        const res = await fetch(`/api/cards/${id}/code`);
+        const data = (await res.json()) as {
+          code?: string;
+          error?: string;
+        };
+        if (cancelled) return;
+        if (!res.ok || !data.code) {
+          toast.error(data.error || "Impossible de rafraîchir le QR");
+          return;
+        }
+        setLiveCode(data.code);
+      } catch {
+        if (!cancelled) toast.error("Impossible de rafraîchir le QR");
+      } finally {
+        if (!cancelled) setRemoteLoading(false);
+      }
+    };
+    void tick(true);
+    const interval = window.setInterval(() => void tick(false), 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [code, providerId, id, isFlipped, isFullScreenDialogOpen]);
+
   const actions: ActionItem[] | undefined = useMemo(() => {
     if (!id || id == "-1") return undefined;
+    if (suppressFullscreen) return undefined;
 
     const actionItems = [
       {
@@ -160,7 +264,15 @@ export function Card({
     ].filter(Boolean) as ActionItem[];
 
     return actionItems;
-  }, [onEditCard, onDeleteCard, onAddToWallet, onShareCard, id, isOffline]);
+  }, [
+    onEditCard,
+    onDeleteCard,
+    onAddToWallet,
+    onShareCard,
+    id,
+    isOffline,
+    suppressFullscreen,
+  ]);
 
   useEffect(() => {
     const updateOnlineStatus = () => setIsOffline(!navigator.onLine);
@@ -188,27 +300,26 @@ export function Card({
       : "bg-white text-black";
   }, [cardColor]);
 
-  // Generate the code as a Base64 image URL
+  // Generate the code as a Base64 image URL (QR = raw payload, no strip)
   useEffect(() => {
     const generateCode = async () => {
-      const parsedCode = code.replace(/[^a-zA-Z0-9]/g, "");
+      const { value, asQr } = payloadForEncode(liveCode, type);
 
-      if (!parsedCode) {
+      if (!value) {
         setCodeDataUrl(null);
         return;
       }
 
-      if ((type == "auto" && parsedCode.length > 26) || type == "qr") {
-        // Use QR code for larger data
-        const qrCodeUrl = await QRCode.toDataURL(parsedCode, {
-          width: 128,
-          margin: 0,
+      if (asQr) {
+        const qrCodeUrl = await QRCode.toDataURL(value, {
+          width: 256,
+          margin: 1,
+          errorCorrectionLevel: "M",
         });
         setCodeDataUrl(qrCodeUrl);
       } else {
-        // Use barcode for smaller data
         const canvas = document.createElement("canvas");
-        JsBarcode(canvas, parsedCode, {
+        JsBarcode(canvas, value, {
           lineColor: "#000",
           width: 2,
           height: 1,
@@ -219,8 +330,8 @@ export function Card({
       }
     };
 
-    generateCode();
-  }, [code, type]);
+    void generateCode();
+  }, [liveCode, type]);
 
   const handleDelete = async () => {
     if (!onDeleteCard) return;
@@ -388,15 +499,22 @@ export function Card({
 
                 {/* Code (Barcode or QR Code) */}
                 <Button
-                  disabled={!actions}
+                  disabled={!actions && !suppressFullscreen}
                   variant="ghost"
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (suppressFullscreen) {
+                      handleFlip();
+                      return;
+                    }
                     setIsFullScreenDialogOpen(true);
                   }}
                   className="flex flex-1 !opacity-100 flex-col bg-white hover:!bg-white/90 rounded-md !px-[5%] !py-[5%] overflow-hidden w-full h-full gap-[10%]"
                 >
                   <div className="flex flex-1 overflow-hidden size-full justify-center items-center">
+                    {remoteLoading && !codeDataUrl ? (
+                      <Loader2 className="size-8 animate-spin text-black/40" />
+                    ) : null}
                     {codeDataUrl != null && (
                       <Image
                         width={128}
@@ -407,8 +525,7 @@ export function Card({
                           "w-full h-full overflow-hidden select-none",
                           {
                             "object-contain":
-                              (type == "auto" && code.length > 26) ||
-                              type == "qr",
+                              payloadForEncode(liveCode, type).asQr,
                           },
                         )}
                         style={{
@@ -419,11 +536,30 @@ export function Card({
                     )}
                   </div>
 
-                  {!((type == "auto" && code.length > 26) || type == "qr") && (
-                    <p className="text-sm leading-none text-black font-mono text-center w-full shrink-0 truncate">
-                      {code.trim().length > 1 ? splitCode(code) : "N/A"}
-                    </p>
-                  )}
+                  {(() => {
+                    const caption = getProviderCodeHandler(providerId)?.caption?.(
+                      code,
+                      liveCode,
+                    );
+                    const asQr = payloadForEncode(liveCode, type).asQr;
+                    if (caption) {
+                      return (
+                        <p className="text-sm leading-none text-black font-mono text-center w-full shrink-0 tracking-wider">
+                          {caption}
+                        </p>
+                      );
+                    }
+                    if (!asQr) {
+                      return (
+                        <p className="text-sm leading-none text-black font-mono text-center w-full shrink-0 truncate">
+                          {liveCode.trim().length > 1
+                            ? splitCode(liveCode)
+                            : "N/A"}
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
                 </Button>
               </div>
             </div>
@@ -450,32 +586,36 @@ export function Card({
         )}
       </ContextMenu>
 
-      {/* Full-Screen Dialog */}
-      <Dialog
-        open={isFullScreenDialogOpen}
-        onOpenChange={setIsFullScreenDialogOpen}
-      >
-        <DialogContent
-          showClose={false}
-          className="p-0 rounded-xl bg-transparent border-none shadow-none outline-none"
+      {/* Full-Screen Dialog — nested card must not open another fullscreen */}
+      {!suppressFullscreen ? (
+        <Dialog
+          open={isFullScreenDialogOpen}
+          onOpenChange={setIsFullScreenDialogOpen}
         >
-          <VisuallyHidden>
-            <DialogHeader>
-              <DialogTitle>{name}</DialogTitle>
-            </DialogHeader>
-          </VisuallyHidden>
-          <Card
-            id="-1"
-            name={name}
-            logo={logo}
-            color={cardColor}
-            code={code}
-            type={type}
-            tag={tag}
-            initialFlipped={true}
-          />
-        </DialogContent>
-      </Dialog>
+          <DialogContent
+            showClose={false}
+            className="p-0 rounded-xl bg-transparent border-none shadow-none outline-none"
+          >
+            <VisuallyHidden>
+              <DialogHeader>
+                <DialogTitle>{name}</DialogTitle>
+              </DialogHeader>
+            </VisuallyHidden>
+            <Card
+              id={id}
+              name={name}
+              logo={logo}
+              color={cardColor}
+              code={liveCode}
+              type={type}
+              tag={tag}
+              providerId={providerId}
+              initialFlipped={true}
+              suppressFullscreen
+            />
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog

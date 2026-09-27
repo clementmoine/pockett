@@ -1,6 +1,6 @@
 /**
- * Linked external services (Klarna today — add entries as we grow).
- * UI lives in ConnectionsModal; each service owns its connect/unlink flow.
+ * Linked external services. UI lives in ConnectionsModal; each service owns
+ * its connect/unlink flow.
  */
 export type ConnectionServiceId = "klarna";
 
