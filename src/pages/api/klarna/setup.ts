@@ -9,13 +9,18 @@ import { klarnaSession } from "@/lib/session";
 
 const prisma = new PrismaClient();
 
-async function status() {
+async function status(soft = false) {
   const configured = hasKlarnaRefreshToken();
   let authOk = false;
   let authError: string | undefined;
 
-  if (configured) {
-    klarnaSession.revokeToken();
+  if (configured && soft) {
+    // Waiting poll after connect: file presence is enough — ingest already
+    // validated the grant. Avoid extra refresh_token calls.
+    authOk = true;
+  } else if (configured) {
+    // Do not revoke first: that forced a Klarna refresh on every status poll
+    // (modal open, waiting interval) and burned / revoked the refresh token.
     const result = await klarnaSession.ensureReady();
     authOk = result.ok;
     if (!result.ok) authError = result.error;
@@ -36,7 +41,11 @@ export default async function handler(
 ) {
   try {
     if (req.method === "GET") {
-      return res.status(200).json(await status());
+      const soft =
+        req.query.soft === "1" ||
+        req.query.soft === "true" ||
+        req.query.soft === "yes";
+      return res.status(200).json(await status(soft));
     }
 
     if (
