@@ -83,9 +83,9 @@ export function KlarnaConnection({ active }: { active: boolean }) {
 
   const linked = Boolean(status && !status.needsSetup);
 
-  const refreshStatus = useCallback(async () => {
+  const refreshStatus = useCallback(async (soft = false) => {
     const data = (await (
-      await fetch("/api/klarna/setup")
+      await fetch(soft ? "/api/klarna/setup?soft=1" : "/api/klarna/setup")
     ).json()) as SetupStatus;
     setStatus(data);
     return data;
@@ -145,14 +145,17 @@ export function KlarnaConnection({ active }: { active: boolean }) {
     let cancelled = false;
     const id = setInterval(async () => {
       try {
-        const data = await refreshStatus();
-        if (cancelled || data.needsSetup) return;
-        setWaiting(false);
-        toast.success(`Klarna lié — ${data.providerCount} providers`);
+        // Soft: only detect that the connector wrote the token — no OAuth refresh.
+        const data = await refreshStatus(true);
+        if (cancelled) return;
+        if (!data.needsSetup) {
+          setWaiting(false);
+          toast.success(`Klarna lié — ${data.providerCount} providers`);
+        }
       } catch {
         /* keep polling */
       }
-    }, 1500);
+    }, 2500);
     return () => {
       cancelled = true;
       clearInterval(id);

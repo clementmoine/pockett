@@ -12,10 +12,13 @@ export async function registerNode(): Promise<void> {
 
   if (!hasKlarnaRefreshToken()) {
     console.warn("[klarna] aucun refresh token — Connect Klarna dans l’app.");
-    return;
+  } else {
+    const result = await klarnaSession.ensureReady();
+    if (result.ok) console.log("[klarna] auth ready");
+    else console.warn(`[klarna] auth failed: ${result.error}`);
   }
 
-  const result = await klarnaSession.ensureReady();
-  if (result.ok) console.log("[klarna] auth ready");
-  else console.warn(`[klarna] auth failed: ${result.error}`);
+  // Keep the refresh grant warm while the server process stays up.
+  // If Pockett is stopped for days, Klarna may still revoke — reconnect then.
+  klarnaSession.startKeepalive();
 }
